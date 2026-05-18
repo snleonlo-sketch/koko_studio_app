@@ -1,0 +1,460 @@
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
+
+import 'login_screen.dart';
+
+class ProfileScreen
+    extends StatefulWidget {
+
+  const ProfileScreen({
+    super.key,
+  });
+
+  @override
+  State<ProfileScreen> createState() =>
+      _ProfileScreenState();
+}
+
+class _ProfileScreenState
+    extends State<ProfileScreen> {
+
+  final user =
+      FirebaseAuth.instance.currentUser;
+
+  final DatabaseReference database =
+  FirebaseDatabase.instance.ref();
+
+  String nombre = '';
+
+  String rol = '';
+
+  bool cargando = true;
+
+  @override
+  void initState() {
+
+    super.initState();
+
+    cargarDatos();
+  }
+
+  Future<void> cargarDatos() async {
+
+    try {
+
+      if (user != null) {
+
+        final snapshot =
+
+        await database
+            .child('usuarios')
+            .child(user!.uid)
+            .get();
+
+        if (snapshot.exists) {
+
+          Map datos =
+          snapshot.value as Map;
+
+          nombre =
+              datos['nombre'] ?? '';
+
+          rol =
+              datos['rol'] ?? '';
+        }
+      }
+
+      setState(() {
+
+        cargando = false;
+      });
+
+    } catch (e) {
+
+      setState(() {
+
+        cargando = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+
+    if (cargando) {
+
+      return const Scaffold(
+
+        body: Center(
+
+          child:
+          CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    return Scaffold(
+
+      backgroundColor:
+      const Color(0xFFFFF5F7),
+
+      appBar: AppBar(
+
+        title: const Text(
+
+          'Mi Perfil',
+
+          style: TextStyle(
+
+            color: Colors.black,
+
+            fontWeight:
+            FontWeight.bold,
+          ),
+        ),
+
+        backgroundColor:
+        const Color(0xFFD9A5B3),
+      ),
+
+      body: SingleChildScrollView(
+
+        child: Padding(
+
+          padding:
+          const EdgeInsets.all(25),
+
+          child: Column(
+
+            children: [
+
+              const SizedBox(height: 20),
+
+              Container(
+
+                padding:
+                const EdgeInsets.all(25),
+
+                decoration: BoxDecoration(
+
+                  color: Colors.white,
+
+                  borderRadius:
+                  BorderRadius.circular(25),
+
+                  boxShadow: [
+
+                    BoxShadow(
+
+                      color:
+                      Colors.black.withOpacity(0.05),
+
+                      blurRadius: 10,
+
+                      offset:
+                      const Offset(0, 4),
+                    ),
+                  ],
+                ),
+
+                child: Column(
+
+                  children: [
+
+                    const CircleAvatar(
+
+                      radius: 60,
+
+                      backgroundColor:
+                      Color(0xFFD9A5B3),
+
+                      child: Icon(
+
+                        Icons.person,
+
+                        size: 70,
+
+                        color: Colors.white,
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    Text(
+
+                      nombre.isEmpty
+                          ? 'Usuario'
+                          : nombre,
+
+                      style: const TextStyle(
+
+                        fontSize: 28,
+
+                        fontWeight:
+                        FontWeight.bold,
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    Text(
+
+                      user?.email ??
+                          'Sin correo',
+
+                      style: const TextStyle(
+
+                        fontSize: 17,
+
+                        color: Colors.grey,
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    Container(
+
+                      padding:
+                      const EdgeInsets.symmetric(
+
+                        horizontal: 20,
+                        vertical: 10,
+                      ),
+
+                      decoration: BoxDecoration(
+
+                        color:
+                        const Color(0xFFD9A5B3),
+
+                        borderRadius:
+                        BorderRadius.circular(30),
+                      ),
+
+                      child: Text(
+
+                        rol.toUpperCase(),
+
+                        style: const TextStyle(
+
+                          color: Colors.white,
+
+                          fontWeight:
+                          FontWeight.bold,
+
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 30),
+
+              Container(
+
+                padding:
+                const EdgeInsets.all(20),
+
+                decoration: BoxDecoration(
+
+                  color: Colors.white,
+
+                  borderRadius:
+                  BorderRadius.circular(20),
+
+                  boxShadow: [
+
+                    BoxShadow(
+
+                      color:
+                      Colors.black.withOpacity(0.05),
+
+                      blurRadius: 10,
+
+                      offset:
+                      const Offset(0, 4),
+                    ),
+                  ],
+                ),
+
+                child: Column(
+
+                  children: [
+
+                    itemInfo(
+
+                      Icons.store,
+
+                      'Negocio',
+
+                      'Koko Studio',
+                    ),
+
+                    const Divider(),
+
+                    itemInfo(
+
+                      Icons.phone,
+
+                      'Teléfono',
+
+                      '+51 999 999 999',
+                    ),
+
+                    const Divider(),
+
+                    itemInfo(
+
+                      Icons.location_on,
+
+                      'Ubicación',
+
+                      'Lima, Perú',
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 40),
+
+              SizedBox(
+
+                width: double.infinity,
+
+                height: 55,
+
+                child: ElevatedButton.icon(
+
+                  onPressed: () async {
+
+                    await FirebaseAuth
+                        .instance
+                        .signOut();
+
+                    Navigator.pushAndRemoveUntil(
+
+                      context,
+
+                      MaterialPageRoute(
+
+                        builder: (context) =>
+
+                        const LoginScreen(),
+                      ),
+
+                          (route) => false,
+                    );
+                  },
+
+                  icon: const Icon(
+
+                    Icons.logout,
+
+                    color: Colors.white,
+                  ),
+
+                  label: const Text(
+
+                    'Cerrar Sesión',
+
+                    style: TextStyle(
+
+                      color: Colors.white,
+
+                      fontWeight:
+                      FontWeight.bold,
+
+                      fontSize: 16,
+                    ),
+                  ),
+
+                  style:
+                  ElevatedButton.styleFrom(
+
+                    backgroundColor:
+                    Colors.red,
+
+                    shape:
+                    RoundedRectangleBorder(
+
+                      borderRadius:
+                      BorderRadius.circular(15),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget itemInfo(
+
+      IconData icono,
+      String titulo,
+      String valor,
+
+      ) {
+
+    return Row(
+
+      children: [
+
+        CircleAvatar(
+
+          backgroundColor:
+          const Color(0xFFD9A5B3),
+
+          child: Icon(
+
+            icono,
+
+            color: Colors.white,
+          ),
+        ),
+
+        const SizedBox(width: 15),
+
+        Column(
+
+          crossAxisAlignment:
+          CrossAxisAlignment.start,
+
+          children: [
+
+            Text(
+
+              titulo,
+
+              style: const TextStyle(
+
+                color: Colors.grey,
+
+                fontSize: 14,
+              ),
+            ),
+
+            const SizedBox(height: 5),
+
+            Text(
+
+              valor,
+
+              style: const TextStyle(
+
+                fontSize: 16,
+
+                fontWeight:
+                FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
