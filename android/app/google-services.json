@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "694907452881",
+    "firebase_url": "https://kokostudioapp-default-rtdb.firebaseio.com",
+    "project_id": "kokostudioapp",
+    "storage_bucket": "kokostudioapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:694907452881:android:824397a96bc17e12cb34f0",
+        "android_client_info": {
+          "package_name": "com.kokostudio.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDtZILtBDt34NWptKIr57PUd6amZ8Fbmtk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:694907452881:android:2288a008937d121ccb34f0",
+        "android_client_info": {
+          "package_name": "com.kokostudio.koko_studio_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDtZILtBDt34NWptKIr57PUd6amZ8Fbmtk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
