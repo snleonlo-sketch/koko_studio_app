@@ -55,6 +55,10 @@ class _CitasScreenState
   TextEditingController();
 
   final TextEditingController
+  horaFinController =
+  TextEditingController();
+
+  final TextEditingController
   precioController =
   TextEditingController();
 
@@ -104,6 +108,7 @@ class _CitasScreenState
     telefonoController.dispose();
     fechaController.dispose();
     horaController.dispose();
+    horaFinController.dispose();
     precioController.dispose();
     observacionesController.dispose();
     buscarController.dispose();
@@ -138,6 +143,7 @@ class _CitasScreenState
       telefonoController.text = (cita['telefono'] ?? '').toString();
       fechaController.text = (cita['fecha'] ?? '').toString();
       horaController.text = (cita['horaInicio'] ?? cita['hora'] ?? '').toString();
+      horaFinController.text = (cita['horaFin'] ?? '').toString();
       precioController.text = (cita['precio'] ?? '').toString();
       observacionesController.text = (cita['observaciones'] ?? '').toString();
       
@@ -324,6 +330,17 @@ class _CitasScreenState
     }
   }
 
+  Future<void> seleccionarHoraFin() async {
+    TimeOfDay? hora = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+
+    if (hora != null) {
+      horaFinController.text = hora.format(context);
+    }
+  }
+
   Future<void>
   guardarCita() async {
 
@@ -378,6 +395,7 @@ class _CitasScreenState
           'trabajadora': trabajadoraSeleccionada,
           'fecha': fechaController.text,
           'hora': horaController.text,
+          'horaFin': horaFinController.text,
           'precio': precioController.text,
           'adelanto': '20',
           'adelantoPagado': adelantoPagado,
@@ -401,6 +419,7 @@ class _CitasScreenState
           'trabajadora': trabajadoraSeleccionada,
           'fecha': fechaController.text,
           'hora': horaController.text,
+          'horaFin': horaFinController.text,
           'precio': precioController.text,
           'adelanto': '20',
           'adelantoPagado': adelantoPagado,
@@ -423,7 +442,7 @@ class _CitasScreenState
           trabajadora: trabajadoraSeleccionada ?? '',
           fecha: fechaController.text,
           hora: horaController.text,
-          horaFin: widget.citaEditar?['horaFin'] ?? '',
+          horaFin: horaFinController.text,
           telefono: telefonoController.text,
           precio: precioController.text,
           sede: sedeSeleccionada,
@@ -491,6 +510,7 @@ class _CitasScreenState
     fechaController.clear();
 
     horaController.clear();
+    horaFinController.clear();
 
     precioController.clear();
 
@@ -1033,7 +1053,7 @@ class _CitasScreenState
 
                 const SizedBox(height: 15),
 
-                GestureDetector(
+                 GestureDetector(
 
                   onTap:
                   seleccionarHora,
@@ -1044,9 +1064,29 @@ class _CitasScreenState
 
                       horaController,
 
-                      'Hora',
+                      'Hora Inicio',
 
                       Icons.access_time,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 15),
+
+                GestureDetector(
+
+                  onTap:
+                  seleccionarHoraFin,
+
+                  child: AbsorbPointer(
+
+                    child: campoTexto(
+
+                      horaFinController,
+
+                      'Hora Fin',
+
+                      Icons.access_time_filled,
                     ),
                   ),
                 ),
