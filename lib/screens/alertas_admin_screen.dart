@@ -32,13 +32,32 @@ class _AlertasAdminScreenState extends State<AlertasAdminScreen> {
       if (mounted) {
         setState(() {
           _cargando = false;
-          if (event.snapshot.value != null) {
-            final Map mapa = event.snapshot.value as Map;
-            _todasLasAlertas = mapa.entries.map((entry) {
-              final alerta = Map<String, dynamic>.from(entry.value as Map);
-              alerta['id'] = entry.key;
-              return alerta;
-            }).toList();
+          final value = event.snapshot.value;
+          if (value != null) {
+            List<Map<String, dynamic>> temp = [];
+            try {
+              if (value is Map) {
+                value.forEach((key, val) {
+                  if (val is Map) {
+                    final alerta = Map<String, dynamic>.from(val);
+                    alerta['id'] = key.toString();
+                    temp.add(alerta);
+                  }
+                });
+              } else if (value is List) {
+                for (int i = 0; i < value.length; i++) {
+                  final val = value[i];
+                  if (val is Map) {
+                    final alerta = Map<String, dynamic>.from(val);
+                    alerta['id'] = i.toString();
+                    temp.add(alerta);
+                  }
+                }
+              }
+            } catch (e) {
+              print('Error al procesar alertas: $e');
+            }
+            _todasLasAlertas = temp;
           } else {
             _todasLasAlertas = [];
           }
