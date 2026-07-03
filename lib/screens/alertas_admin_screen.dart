@@ -148,7 +148,7 @@ class _AlertasAdminScreenState extends State<AlertasAdminScreen> {
     final alertas = _todasLasAlertas.where((alerta) {
       final sede = (alerta['sede'] ?? '').toString();
       final leida = alerta['leida'] == true;
-      return !leida && (filtroSede == 'Todas' || sede == filtroSede);
+      return !leida && (filtroSede == 'Todas' || sede.toLowerCase() == filtroSede.toLowerCase());
     }).toList();
 
     alertas.sort((a, b) {
@@ -236,7 +236,7 @@ class _AlertasAdminScreenState extends State<AlertasAdminScreen> {
       final leida = alerta['leida'] == true;
 
       if (!leida) return false;
-      if (filtroSede != 'Todas' && sede != filtroSede) return false;
+      if (filtroSede != 'Todas' && sede.toLowerCase() != filtroSede.toLowerCase()) return false;
 
       if (buscarTexto.isNotEmpty) {
         final cliente = (alerta['cliente'] ?? '').toString().toLowerCase();

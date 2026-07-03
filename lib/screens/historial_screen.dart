@@ -99,13 +99,94 @@ class _HistorialScreenState extends State<HistorialScreen> {
     return '$inicio - $fin';
   }
 
+  Future<void> registrarAlertaAdmin({
+    required String accion, // 'creacion', 'edicion', 'eliminacion'
+    required String motivo,
+    required String cliente,
+    required String servicio,
+    required String trabajadora,
+    required String fecha,
+    required String hora,
+    String? horaFin,
+    required String telefono,
+    required String precio,
+    required String sede,
+  }) async {
+    try {
+      final nuevaAlertaRef = FirebaseDatabase.instance.ref().child('alertas_admin').push();
+      await nuevaAlertaRef.set({
+        'fechaHora': DateTime.now().toIso8601String(),
+        'sede': sede.isNotEmpty ? sede : 'Belaunde',
+        'realizadoPor': nombreUsuario.isNotEmpty ? nombreUsuario : 'Administrador',
+        'rol': rolUsuario.isNotEmpty ? rolUsuario : 'admin',
+        'motivo': motivo,
+        'cliente': cliente,
+        'servicio': servicio,
+        'trabajadora': trabajadora,
+        'fecha': fecha,
+        'hora': hora,
+        'horaFin': horaFin ?? '',
+        'accion': accion,
+        'leida': false,
+        'telefono': telefono,
+        'precio': precio,
+      });
+    } catch (e) {
+      print('Error al registrar alerta admin desde historial: $e');
+    }
+  }
+
   Future<void> cambiarEstado(String id, String estado) async {
+    try {
+      final snap = await citasRef.child(id).get();
+      if (snap.exists && snap.value != null) {
+        final Map map = snap.value as Map;
+        await registrarAlertaAdmin(
+          accion: 'edicion',
+          motivo: 'Estado de cita cambiado a $estado desde historial',
+          cliente: (map['cliente'] ?? '').toString(),
+          servicio: (map['servicio'] ?? '').toString(),
+          trabajadora: (map['trabajadora'] ?? '').toString(),
+          fecha: (map['fecha'] ?? '').toString(),
+          hora: (map['hora'] ?? '').toString(),
+          horaFin: (map['horaFin'] ?? '').toString(),
+          telefono: (map['telefono'] ?? '').toString(),
+          precio: (map['precio'] ?? '').toString(),
+          sede: (map['sede'] ?? '').toString(),
+        );
+      }
+    } catch (e) {
+      print('Error logging state update alert in historial: $e');
+    }
+
     await citasRef.child(id).update({
       'estado': estado,
     });
   }
 
   Future<void> eliminarCita(String id) async {
+    try {
+      final snap = await citasRef.child(id).get();
+      if (snap.exists && snap.value != null) {
+        final Map map = snap.value as Map;
+        await registrarAlertaAdmin(
+          accion: 'eliminacion',
+          motivo: 'Cita eliminada desde historial',
+          cliente: (map['cliente'] ?? '').toString(),
+          servicio: (map['servicio'] ?? '').toString(),
+          trabajadora: (map['trabajadora'] ?? '').toString(),
+          fecha: (map['fecha'] ?? '').toString(),
+          hora: (map['hora'] ?? '').toString(),
+          horaFin: (map['horaFin'] ?? '').toString(),
+          telefono: (map['telefono'] ?? '').toString(),
+          precio: (map['precio'] ?? '').toString(),
+          sede: (map['sede'] ?? '').toString(),
+        );
+      }
+    } catch (e) {
+      print('Error logging deletion alert in historial: $e');
+    }
+
     await citasRef.child(id).remove();
   }
 

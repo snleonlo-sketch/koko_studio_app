@@ -366,53 +366,71 @@ class _CitasScreenState
               .push()
               .key!;
 
-      await database
-          .child('citas')
-          .child(id)
-          .set({
+      if (citaEditandoId != null) {
+        await database
+            .child('citas')
+            .child(id)
+            .update({
+          'cliente': clienteController.text,
+          'sede': sedeSeleccionada,
+          'telefono': telefonoController.text,
+          'servicio': servicioSeleccionado,
+          'trabajadora': trabajadoraSeleccionada,
+          'fecha': fechaController.text,
+          'hora': horaController.text,
+          'precio': precioController.text,
+          'adelanto': '20',
+          'adelantoPagado': adelantoPagado,
+          'estadoPago': adelantoPagado
+              ? 'adelanto pagado'
+              : 'pendiente de adelanto',
+          'observaciones': observacionesController.text.trim(),
+          'estado': widget.citaEditar != null
+              ? (widget.citaEditar!['estado'] ?? 'pendiente')
+              : (adelantoPagado ? 'confirmada' : 'pendiente'),
+        });
+      } else {
+        await database
+            .child('citas')
+            .child(id)
+            .set({
+          'cliente': clienteController.text,
+          'sede': sedeSeleccionada,
+          'telefono': telefonoController.text,
+          'servicio': servicioSeleccionado,
+          'trabajadora': trabajadoraSeleccionada,
+          'fecha': fechaController.text,
+          'hora': horaController.text,
+          'precio': precioController.text,
+          'adelanto': '20',
+          'adelantoPagado': adelantoPagado,
+          'estadoPago': adelantoPagado
+              ? 'adelanto pagado'
+              : 'pendiente de adelanto',
+          'observaciones': observacionesController.text.trim(),
+          'estado': adelantoPagado ? 'confirmada' : 'pendiente',
+        });
+      }
 
-        'cliente':
-        clienteController.text,
-
-        'sede':
-        sedeSeleccionada,
-
-        'telefono':
-        telefonoController.text,
-
-        'servicio':
-        servicioSeleccionado,
-
-        'trabajadora':
-        trabajadoraSeleccionada,
-
-        'fecha':
-        fechaController.text,
-
-        'hora':
-        horaController.text,
-
-        'precio':
-        precioController.text,
-
-        'adelanto':
-        '20',
-
-        'adelantoPagado':
-        adelantoPagado,
-
-        'estadoPago':
-        adelantoPagado
-            ? 'adelanto pagado'
-            : 'pendiente de adelanto',
-
-        'observaciones':
-        observacionesController.text.trim(),
-
-        'estado': widget.citaEditar != null
-            ? (widget.citaEditar!['estado'] ?? 'pendiente')
-            : (adelantoPagado ? 'confirmada' : 'pendiente'),
-      });
+      try {
+        await registrarAlertaAdmin(
+          accion: citaEditandoId == null ? 'creacion' : 'edicion',
+          motivo: citaEditandoId == null
+              ? 'Nueva cita registrada desde gestión'
+              : (widget.motivoEdicion ?? 'Cita editada desde gestión'),
+          cliente: clienteController.text,
+          servicio: servicioSeleccionado ?? '',
+          trabajadora: trabajadoraSeleccionada ?? '',
+          fecha: fechaController.text,
+          hora: horaController.text,
+          horaFin: widget.citaEditar?['horaFin'] ?? '',
+          telefono: telefonoController.text,
+          precio: precioController.text,
+          sede: sedeSeleccionada,
+        );
+      } catch (e) {
+        print('Error registrando alerta admin: $e');
+      }
 
       await NotificationService
           .mostrarNotificacion(
@@ -491,9 +509,65 @@ class _CitasScreenState
     setState(() {});
   }
 
-  Future<void>
-  eliminarCita(
-      String id) async {
+  Future<void> registrarAlertaAdmin({
+    required String accion, // 'creacion', 'edicion', 'eliminacion'
+    required String motivo,
+    required String cliente,
+    required String servicio,
+    required String trabajadora,
+    required String fecha,
+    required String hora,
+    String? horaFin,
+    required String telefono,
+    required String precio,
+    required String sede,
+  }) async {
+    try {
+      final nuevaAlertaRef = database.child('alertas_admin').push();
+      await nuevaAlertaRef.set({
+        'fechaHora': DateTime.now().toIso8601String(),
+        'sede': sede.isNotEmpty ? sede : 'Belaunde',
+        'realizadoPor': nombreUsuario.isNotEmpty ? nombreUsuario : 'Administrador',
+        'rol': rolUsuario.isNotEmpty ? rolUsuario : 'admin',
+        'motivo': motivo,
+        'cliente': cliente,
+        'servicio': servicio,
+        'trabajadora': trabajadora,
+        'fecha': fecha,
+        'hora': hora,
+        'horaFin': horaFin ?? '',
+        'accion': accion,
+        'leida': false,
+        'telefono': telefono,
+        'precio': precio,
+      });
+    } catch (e) {
+      print('Error al registrar alerta admin: $e');
+    }
+  }
+
+  Future<void> eliminarCita(String id) async {
+    try {
+      final snap = await database.child('citas').child(id).get();
+      if (snap.exists && snap.value != null) {
+        final Map map = snap.value as Map;
+        await registrarAlertaAdmin(
+          accion: 'eliminacion',
+          motivo: 'Cita eliminada de la base de datos',
+          cliente: (map['cliente'] ?? '').toString(),
+          servicio: (map['servicio'] ?? '').toString(),
+          trabajadora: (map['trabajadora'] ?? '').toString(),
+          fecha: (map['fecha'] ?? '').toString(),
+          hora: (map['hora'] ?? '').toString(),
+          horaFin: (map['horaFin'] ?? '').toString(),
+          telefono: (map['telefono'] ?? '').toString(),
+          precio: (map['precio'] ?? '').toString(),
+          sede: (map['sede'] ?? '').toString(),
+        );
+      }
+    } catch (e) {
+      print('Error al registrar alerta de eliminación: $e');
+    }
 
     await database
         .child('citas')
@@ -501,36 +575,42 @@ class _CitasScreenState
         .remove();
 
     AwesomeDialog(
-
       context: context,
-
-      dialogType:
-      DialogType.success,
-
+      dialogType: DialogType.success,
       title: 'Eliminada',
-
-      desc:
-      'Cita eliminada correctamente',
-
+      desc: 'Cita eliminada correctamente',
       btnOkOnPress: () {},
     ).show();
   }
 
-  Future<void>
-  actualizarEstado(
-
-      String id,
-      String estado,
-
-      ) async {
+  Future<void> actualizarEstado(String id, String estado) async {
+    try {
+      final snap = await database.child('citas').child(id).get();
+      if (snap.exists && snap.value != null) {
+        final Map map = snap.value as Map;
+        await registrarAlertaAdmin(
+          accion: 'edicion',
+          motivo: 'Estado de cita cambiado a $estado',
+          cliente: (map['cliente'] ?? '').toString(),
+          servicio: (map['servicio'] ?? '').toString(),
+          trabajadora: (map['trabajadora'] ?? '').toString(),
+          fecha: (map['fecha'] ?? '').toString(),
+          hora: (map['hora'] ?? '').toString(),
+          horaFin: (map['horaFin'] ?? '').toString(),
+          telefono: (map['telefono'] ?? '').toString(),
+          precio: (map['precio'] ?? '').toString(),
+          sede: (map['sede'] ?? '').toString(),
+        );
+      }
+    } catch (e) {
+      print('Error al registrar alerta de cambio de estado: $e');
+    }
 
     await database
         .child('citas')
         .child(id)
         .update({
-
-      'estado':
-      estado,
+      'estado': estado,
     });
   }
 
@@ -1295,7 +1375,7 @@ class _CitasScreenState
                                   const SizedBox(height: 18),
                                   Text('Sede: ${cita['sede'] ?? 'No indicada'}'),
                                   Text('📅 ${cita['fecha']}'),
-                                  Text('⏰ ${cita['hora']}'),
+                                  Text('⏰ ${cita['hora']}${cita['horaFin'] != null && (cita['horaFin'] ?? '').toString().isNotEmpty ? ' - ${cita['horaFin']}' : ''}'),
                                   Text('👩 ${cita['trabajadora']}'),
                                   Text('📞 ${cita['telefono']}'),
                                   Text('💰 S/ ${cita['precio']}'),
