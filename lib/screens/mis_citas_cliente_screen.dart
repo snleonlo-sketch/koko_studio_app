@@ -92,6 +92,24 @@ class _MisCitasClienteScreenState
         estado == 'confirmada';
   }
 
+  String rangoHora(Map cita) {
+    final inicio =
+        (cita['horaInicio'] ??
+                cita['hora'] ??
+                '')
+            .toString();
+
+    final fin =
+        (cita['horaFin'] ?? '')
+            .toString();
+
+    if (fin.isEmpty) {
+      return inicio;
+    }
+
+    return '$inicio - $fin';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -243,7 +261,7 @@ class _MisCitasClienteScreenState
                     ),
                     const SizedBox(height: 15),
                     Text('Fecha: ${cita['fecha'] ?? ''}'),
-                    Text('Hora: ${cita['hora'] ?? ''}'),
+                    Text('Hora: ${rangoHora(cita)}'),
                     Text('Especialista: ${cita['trabajadora'] ?? ''}'),
                     Text(
                       'Adelanto: S/ ${cita['adelanto'] ?? '20'} - ${cita['estadoPago'] ?? 'pendiente'}',

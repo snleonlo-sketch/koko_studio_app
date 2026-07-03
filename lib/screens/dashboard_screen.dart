@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -15,6 +16,8 @@ import 'pagos_screen.dart';
 import 'estadisticas_screen.dart';
 import 'trabajadoras_screen.dart';
 import 'servicios_screen.dart';
+import 'alertas_admin_screen.dart';
+
 
 class DashboardScreen
     extends StatefulWidget {
@@ -46,6 +49,12 @@ class _DashboardScreenState
 
   double ingresos = 0;
 
+  int totalCanceladas = 0;
+
+  StreamSubscription? _citasSubscription;
+  StreamSubscription? _serviciosSubscription;
+  StreamSubscription? _trabajadorasSubscription;
+
   @override
   void initState() {
 
@@ -54,11 +63,19 @@ class _DashboardScreenState
     cargarResumen();
   }
 
+  @override
+  void dispose() {
+    _citasSubscription?.cancel();
+    _serviciosSubscription?.cancel();
+    _trabajadorasSubscription?.cancel();
+    super.dispose();
+  }
+
   void cargarResumen() {
 
     // CITAS
 
-    database
+    _citasSubscription = database
         .child('citas')
         .onValue
         .listen((event) {
@@ -67,7 +84,7 @@ class _DashboardScreenState
           event.snapshot.value;
 
       totalCitas = 0;
-
+      totalCanceladas = 0;
       ingresos = 0;
 
       if (data != null) {
@@ -79,18 +96,18 @@ class _DashboardScreenState
             citas.length;
 
         citas.forEach((key, value) {
+          final estado = (value['estado'] ?? '').toString().toLowerCase();
 
-          if (value['estado'] ==
-              'finalizada') {
-
+          if (estado == 'finalizada') {
             ingresos +=
                 double.tryParse(
-
                   value['precio']
                       .toString(),
-
                 ) ??
                     0;
+          } else if (estado == 'cancelada') {
+            totalCanceladas++;
+            ingresos += 20; // S/ 20 del anticipo quedan en caja
           }
         });
       }
@@ -100,7 +117,7 @@ class _DashboardScreenState
 
     // SERVICIOS
 
-    database
+    _serviciosSubscription = database
         .child('servicios')
         .onValue
         .listen((event) {
@@ -124,7 +141,7 @@ class _DashboardScreenState
 
     // TRABAJADORAS
 
-    database
+    _trabajadorasSubscription = database
         .child('trabajadoras')
         .onValue
         .listen((event) {
@@ -164,7 +181,11 @@ class _DashboardScreenState
 
       drawer: Drawer(
 
-        child: Column(
+        child: SafeArea(
+
+          bottom: true,
+
+          child: Column(
 
           children: [
 
@@ -262,7 +283,7 @@ class _DashboardScreenState
 
               Icons.groups,
 
-              'Trabajadoras',
+              'Personal',
 
               const TrabajadorasScreen(),
             ),
@@ -298,6 +319,17 @@ class _DashboardScreenState
               'Historial',
 
               const HistorialScreen(),
+            ),
+
+            drawerItem(
+
+              context,
+
+              Icons.notifications_active,
+
+              'Buzon de Alertas',
+
+              const AlertasAdminScreen(),
             ),
 
             drawerItem(
@@ -351,8 +383,9 @@ class _DashboardScreenState
               },
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 24),
           ],
+        ),
         ),
       ),
 
@@ -621,7 +654,7 @@ class _DashboardScreenState
 
                     context,
 
-                    'Trabajadoras',
+                    'Personal',
 
                     Icons.groups,
 
@@ -665,6 +698,19 @@ class _DashboardScreenState
 
                     context,
 
+                    'Alertas',
+
+                    Icons.notifications_active,
+
+                    const AlertasAdminScreen(),
+                  ),
+
+
+
+                  itemMenu(
+
+                    context,
+
                     'Método Pago',
 
                     Icons.payment,
@@ -681,112 +727,6 @@ class _DashboardScreenState
                     Icons.person,
 
                     const ProfileScreen(),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 30),
-
-              // RESUMEN
-
-              const Text(
-
-                'Resumen General',
-
-                style: TextStyle(
-
-                  fontSize: 24,
-
-                  fontWeight:
-                  FontWeight.bold,
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              Row(
-
-                children: [
-
-                  Expanded(
-
-                    child: resumenCard(
-
-                      context,
-
-                      'Citas',
-
-                      totalCitas
-                          .toString(),
-
-                      Icons.calendar_month,
-
-                      Colors.pink,
-                    ),
-                  ),
-
-                  const SizedBox(
-                      width: 15),
-
-                  Expanded(
-
-                    child: resumenCard(
-
-                      context,
-
-                      'Servicios',
-
-                      totalServicios
-                          .toString(),
-
-                      Icons.design_services,
-
-                      Colors.orange,
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 15),
-
-              Row(
-
-                children: [
-
-                  Expanded(
-
-                    child: resumenCard(
-
-                      context,
-
-                      'Trabajadoras',
-
-                      totalTrabajadoras
-                          .toString(),
-
-                      Icons.groups,
-
-                      Colors.purple,
-                    ),
-                  ),
-
-                  const SizedBox(
-                      width: 15),
-
-                  Expanded(
-
-                    child: resumenCard(
-
-                      context,
-
-                      'Ingresos',
-
-                      'S/ ${ingresos.toStringAsFixed(0)}',
-
-                      Icons.attach_money,
-
-                      Colors.green,
-                    ),
                   ),
                 ],
               ),

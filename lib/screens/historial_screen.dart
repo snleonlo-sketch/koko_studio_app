@@ -3,1006 +3,549 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../services/pdf_service.dart';
 import '../services/excel_service.dart';
+import '../services/pdf_service.dart';
+import '../services/role_service.dart';
+import 'citas_screen.dart';
 
-class HistorialScreen
-    extends StatefulWidget {
-
-  const HistorialScreen({
-    super.key,
-  });
+class HistorialScreen extends StatefulWidget {
+  const HistorialScreen({super.key});
 
   @override
-  State<HistorialScreen> createState() =>
-      _HistorialScreenState();
+  State<HistorialScreen> createState() => _HistorialScreenState();
 }
 
-class _HistorialScreenState
-    extends State<HistorialScreen> {
-
+class _HistorialScreenState extends State<HistorialScreen> {
   final DatabaseReference citasRef =
-  FirebaseDatabase.instance
-      .ref()
-      .child('citas');
+      FirebaseDatabase.instance.ref().child('citas');
 
-  final TextEditingController
-  buscarController =
-  TextEditingController();
+  final RoleService roleService = RoleService();
+
+  final TextEditingController buscarController = TextEditingController();
 
   String textoBusqueda = '';
+  String rolUsuario = '';
+  String nombreUsuario = '';
+  String sedeUsuario = '';
+  DateTime fechaSeleccionada = DateTime.now();
+  String sedeSeleccionada = 'Todas';
 
   int totalPendientes = 0;
-
   int totalConfirmadas = 0;
-
   int totalFinalizadas = 0;
-
   int totalCanceladas = 0;
-
   double ingresos = 0;
 
-  Color colorEstado(
-      String estado) {
+  bool get esAdmin => rolUsuario == 'admin';
+  bool get esRecepcionista => rolUsuario == 'recepcionista';
+  bool get puedeEditarCitas => esAdmin || esRecepcionista;
 
-    switch (
-    estado.toLowerCase()) {
+  @override
+  void initState() {
+    super.initState();
+    cargarUsuario();
+  }
 
+  @override
+  void dispose() {
+    buscarController.dispose();
+    super.dispose();
+  }
+
+  Future<void> cargarUsuario() async {
+    final datos = await roleService.obtenerDatosUsuario();
+
+    if (!mounted) return;
+
+    setState(() {
+      rolUsuario = (datos['rol'] ?? '').toString();
+      nombreUsuario = (datos['nombre'] ?? '').toString();
+      sedeUsuario = (datos['sede'] ?? '').toString();
+    });
+  }
+
+  Color colorEstado(String estado) {
+    switch (estado.toLowerCase()) {
       case 'confirmada':
         return const Color(0xFF7E9CCB);
-
       case 'finalizada':
         return const Color(0xFF7BAE8D);
-
       case 'cancelada':
         return const Color(0xFFC97D7D);
-
       default:
         return const Color(0xFFD9A5B3);
     }
   }
 
-  IconData iconoEstado(
-      String estado) {
-
-    switch (
-    estado.toLowerCase()) {
-
+  IconData iconoEstado(String estado) {
+    switch (estado.toLowerCase()) {
       case 'confirmada':
         return Icons.check_circle;
-
       case 'finalizada':
         return Icons.done_all;
-
       case 'cancelada':
         return Icons.cancel;
-
       default:
         return Icons.access_time;
     }
   }
 
-  Future<void>
-  cambiarEstado(
+  String rangoHora(Map<String, dynamic> cita) {
+    final inicio = (cita['horaInicio'] ?? cita['hora'] ?? '').toString();
+    final fin = (cita['horaFin'] ?? '').toString();
 
-      String id,
-      String estado,
+    if (fin.isEmpty) return inicio;
 
-      ) async {
+    return '$inicio - $fin';
+  }
 
-    await citasRef
-        .child(id)
-        .update({
-
-      'estado':
-      estado,
+  Future<void> cambiarEstado(String id, String estado) async {
+    await citasRef.child(id).update({
+      'estado': estado,
     });
   }
 
-  Future<void>
-  eliminarCita(
-      String id) async {
-
-    await citasRef
-        .child(id)
-        .remove();
+  Future<void> eliminarCita(String id) async {
+    await citasRef.child(id).remove();
   }
 
-  Future<void>
-  enviarWhatsApp(
+  Future<String?> pedirMotivoEdicion() async {
+    final controller = TextEditingController();
 
-      String telefono,
-      String cliente,
-      String fecha,
-      String hora,
-      String servicio,
+    final motivo = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Motivo de la edicion'),
+          content: TextField(
+            controller: controller,
+            minLines: 2,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              hintText: 'Ejemplo: la clienta solicito cambiar el horario',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final texto = controller.text.trim();
 
-      ) async {
+                if (texto.isEmpty) return;
 
-    String numero =
-
-    telefono.replaceAll(
-      RegExp(r'[^0-9]'),
-      '',
+                Navigator.pop(context, texto);
+              },
+              child: const Text('Continuar'),
+            ),
+          ],
+        );
+      },
     );
 
-    if (!numero.startsWith('51')) {
+    controller.dispose();
 
+    return motivo;
+  }
+
+  Future<void> abrirEdicionCita(Map<String, dynamic> cita) async {
+    final motivo = esRecepcionista
+        ? await pedirMotivoEdicion()
+        : 'Edicion realizada por administrador';
+
+    if (motivo == null || motivo.trim().isEmpty) return;
+    if (!mounted) return;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CitasScreen(
+          citaEditar: cita,
+          motivoEdicion: motivo,
+        ),
+      ),
+    );
+  }
+
+  Future<void> enviarWhatsApp(
+    String telefono,
+    String cliente,
+    String fecha,
+    String hora,
+    String servicio,
+  ) async {
+    String numero = telefono.replaceAll(RegExp(r'[^0-9]'), '');
+
+    if (!numero.startsWith('51')) {
       numero = '51$numero';
     }
 
-    String mensaje =
+    final mensaje = 'Hola $cliente\n\n'
+        'Te recordamos tu cita en Koko Studio.\n\n'
+        'Fecha: $fecha\n'
+        'Hora: $hora\n'
+        'Servicio: $servicio\n\n'
+        'Te esperamos.';
 
-        'Hola $cliente 💖\n\n'
-
-        'Te recordamos tu cita en '
-        'Koko Studio ✨\n\n'
-
-        '📅 Fecha: $fecha\n'
-        '⏰ Hora: $hora\n'
-        '💅 Servicio: $servicio\n\n'
-
-        'Te esperamos 💕';
-
-    final Uri uri = Uri.parse(
-
+    final uri = Uri.parse(
       'https://wa.me/$numero?text=${Uri.encodeComponent(mensaje)}',
     );
 
     await launchUrl(
-
       uri,
-
-      mode:
-      LaunchMode.externalApplication,
+      mode: LaunchMode.externalApplication,
     );
   }
 
-  Future<void>
-  generarPDF(Map cita) async {
-
-    final pdf =
-
-    await PdfService
-        .generarBoleta(
-
-      cliente:
-      cita['cliente'],
-
-      servicio:
-      cita['servicio'],
-
-      fecha:
-      cita['fecha'],
-
-      hora:
-      cita['hora'],
-
-      precio:
-      cita['precio'],
+  Future<void> generarPDF(Map<String, dynamic> cita) async {
+    final pdf = await PdfService.generarBoleta(
+      cliente: cita['cliente'],
+      servicio: cita['servicio'],
+      fecha: cita['fecha'],
+      hora: rangoHora(cita),
+      precio: cita['precio'],
     );
 
     await Printing.layoutPdf(
-
       onLayout: (format) async => pdf,
     );
   }
 
-  Future<void>
-  exportarExcel(
-      List citasLista) async {
+  Future<void> exportarExcel(List<Map<String, dynamic>> citasLista) async {
+    final lista = citasLista.map((cita) {
+      return {
+        'cliente': cita['cliente'],
+        'telefono': cita['telefono'],
+        'servicio': cita['servicio'],
+        'trabajadora': cita['trabajadora'],
+        'fecha': cita['fecha'],
+        'hora': rangoHora(cita),
+        'precio': cita['precio'],
+        'estado': cita['estado'],
+      };
+    }).toList();
 
-    List<Map<String, dynamic>>
-    lista = [];
+    await ExcelService.exportarCitas(citas: lista);
+  }
 
-    for (var cita in citasLista) {
+  List<Map<String, dynamic>> prepararCitas(Map<dynamic, dynamic> citas) {
+    final citasLista = <Map<String, dynamic>>[];
 
-      lista.add({
+    totalPendientes = 0;
+    totalConfirmadas = 0;
+    totalFinalizadas = 0;
+    totalCanceladas = 0;
+    ingresos = 0;
 
-        'cliente':
-        cita['cliente'],
+    final targetFechaString = '${fechaSeleccionada.day}/${fechaSeleccionada.month}/${fechaSeleccionada.year}';
 
-        'telefono':
-        cita['telefono'],
+    citas.forEach((key, value) {
+      final cita = Map<String, dynamic>.from(value as Map);
+      final estado = (cita['estado'] ?? 'pendiente').toString();
+      final sede = (cita['sede'] ?? '').toString();
+      final fechaString = (cita['fecha'] ?? '').toString();
 
-        'servicio':
-        cita['servicio'],
+      if (esRecepcionista && sedeUsuario.isNotEmpty && sede != sedeUsuario) {
+        return;
+      }
 
-        'trabajadora':
-        cita['trabajadora'],
+      // Filtrado por sede para administrador
+      if (esAdmin && sedeSeleccionada != 'Todas' && sede != sedeSeleccionada) {
+        return;
+      }
 
-        'fecha':
-        cita['fecha'],
+      // Filtrado por fecha diaria exacta
+      if (fechaString != targetFechaString) {
+        return;
+      }
 
-        'hora':
-        cita['hora'],
+      if (estado == 'pendiente') totalPendientes++;
+      if (estado == 'confirmada') totalConfirmadas++;
+      if (estado == 'cancelada') {
+        totalCanceladas++;
+        ingresos += 20; // S/ 20 del anticipo no reembolsable quedan en caja
+      }
+      if (estado == 'finalizada') {
+        totalFinalizadas++;
+        ingresos += double.tryParse((cita['precio'] ?? '0').toString()) ?? 0;
+      }
 
-        'precio':
-        cita['precio'],
+      citasLista.add({
+        'id': key,
+        'cliente': cita['cliente'] ?? '',
+        'clienteUid': cita['clienteUid'],
+        'telefono': cita['telefono'] ?? '',
+        'servicio': cita['servicio'] ?? '',
+        'trabajadora': cita['trabajadora'] ?? '',
+        'sede': sede,
+        'fecha': fechaString,
+        'hora': cita['horaInicio'] ?? cita['hora'] ?? '',
+        'horaInicio': cita['horaInicio'] ?? cita['hora'] ?? '',
+        'horaFin': cita['horaFin'] ?? '',
+        'estado': estado,
+        'precio': (cita['precio'] ?? '').toString(),
+        'adelanto': cita['adelanto'] ?? '20',
+        'adelantoPagado': cita['adelantoPagado'] == true,
+        'estadoPago': cita['estadoPago'] ?? '',
+        'observaciones': cita['observaciones'] ?? '',
+      });
+    });
 
-        'estado':
-        cita['estado'],
+    // Ordenar cronológicamente por hora de inicio
+    citasLista.sort((a, b) {
+      return (a['horaInicio'] ?? '').toString().compareTo((b['horaInicio'] ?? '').toString());
+    });
+
+    if (textoBusqueda.trim().isEmpty) return citasLista;
+
+    final busqueda = textoBusqueda.toLowerCase();
+    final numero = textoBusqueda.replaceAll(RegExp(r'[^0-9]'), '');
+
+    return citasLista.where((cita) {
+      final cliente = cita['cliente'].toString().toLowerCase();
+      final telefono =
+          cita['telefono'].toString().replaceAll(RegExp(r'[^0-9]'), '');
+
+      return cliente.contains(busqueda) ||
+          (numero.isNotEmpty && telefono.contains(numero));
+    }).toList();
+  }
+
+  Future<void> _seleccionarFechaHistorial(BuildContext context) async {
+    final DateTime? fecha = await showDatePicker(
+      context: context,
+      initialDate: fechaSeleccionada,
+      firstDate: DateTime(2026),
+      lastDate: DateTime(2035),
+    );
+
+    if (fecha != null && mounted) {
+      setState(() {
+        fechaSeleccionada = fecha;
       });
     }
-
-    await ExcelService
-        .exportarCitas(
-
-      citas: lista,
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
-
-      backgroundColor:
-      Theme.of(context)
-          .scaffoldBackgroundColor,
-
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-
         elevation: 0,
-
         centerTitle: true,
-
         title: const Text(
-
           'Historial de Citas',
-
-          style: TextStyle(
-
-            fontWeight:
-            FontWeight.bold,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
       ),
-
       body: StreamBuilder(
-
-        stream:
-        citasRef.onValue,
-
-        builder:
-            (context, snapshot) {
-
+        stream: citasRef.onValue,
+        builder: (context, snapshot) {
           if (snapshot.hasError) {
-
             return const Center(
-
-              child:
-              Text('Ocurrió un error'),
+              child: Text('Ocurrio un error'),
             );
           }
 
-          if (!snapshot.hasData ||
-              snapshot.data!
-                  .snapshot
-                  .value ==
-                  null) {
-
+          if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
             return const Center(
-
               child: Text(
-
                 'No hay citas registradas',
-
                 style: TextStyle(
-
                   fontSize: 18,
-
-                  color:
-                  Colors.grey,
+                  color: Colors.grey,
                 ),
               ),
             );
           }
 
-          Map<dynamic, dynamic>
-          citas =
+          final citas =
+              snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
 
-          snapshot.data!
-              .snapshot
-              .value
-          as Map<dynamic, dynamic>;
-
-          List citasLista = [];
-
-          totalPendientes = 0;
-
-          totalConfirmadas = 0;
-
-          totalFinalizadas = 0;
-
-          totalCanceladas = 0;
-
-          ingresos = 0;
-
-          citas.forEach((key, value) {
-
-            String estado =
-                value['estado'] ??
-                    'pendiente';
-
-            if (estado ==
-                'pendiente') {
-
-              totalPendientes++;
-            }
-
-            if (estado ==
-                'confirmada') {
-
-              totalConfirmadas++;
-            }
-
-            if (estado ==
-                'finalizada') {
-
-              totalFinalizadas++;
-
-              ingresos +=
-                  double.tryParse(
-
-                    value['precio']
-                        .toString(),
-
-                  ) ??
-                      0;
-            }
-
-            if (estado ==
-                'cancelada') {
-
-              totalCanceladas++;
-            }
-
-            citasLista.add({
-
-              'id': key,
-
-              'cliente':
-              value['cliente'] ??
-                  '',
-
-              'telefono':
-              value['telefono'] ??
-                  '',
-
-              'servicio':
-              value['servicio'] ??
-                  '',
-
-              'trabajadora':
-              value['trabajadora'] ??
-                  '',
-
-              'fecha':
-              value['fecha'] ??
-                  '',
-
-              'hora':
-              value['hora'] ??
-                  '',
-
-              'estado':
-              estado,
-
-              'precio':
-              value['precio']
-                  .toString(),
-            });
-          });
-
-          if (textoBusqueda
-              .isNotEmpty) {
-
-            citasLista =
-                citasLista.where((cita) {
-
-                  return cita['cliente']
-                      .toString()
-                      .toLowerCase()
-                      .contains(
-
-                    textoBusqueda
-                        .toLowerCase(),
-                  );
-                }).toList();
-          }
+          final citasLista = prepararCitas(citas);
 
           return Column(
-
             children: [
-
               Padding(
-
-                padding:
-                const EdgeInsets.all(
-                    15),
-
+                padding: const EdgeInsets.all(15),
                 child: Column(
-
                   children: [
-
                     TextField(
-
-                      controller:
-                      buscarController,
-
-                      onChanged:
-                          (value) {
-
+                      controller: buscarController,
+                      onChanged: (value) {
                         setState(() {
-
-                          textoBusqueda =
-                              value;
+                          textoBusqueda = value;
                         });
                       },
-
-                      decoration:
-                      InputDecoration(
-
-                        hintText:
-                        'Buscar cliente',
-
-                        prefixIcon:
-                        const Icon(
-                          Icons.search,
-                        ),
-
+                      decoration: InputDecoration(
+                        hintText: 'Buscar clienta o celular',
+                        prefixIcon: const Icon(Icons.search),
                         filled: true,
-
-                        fillColor:
-                        Theme.of(context)
-                            .cardColor,
-
-                        border:
-                        OutlineInputBorder(
-
-                          borderRadius:
-                          BorderRadius.circular(
-                              15),
-
-                          borderSide:
-                          BorderSide.none,
+                        fillColor: Theme.of(context).cardColor,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15),
+                          borderSide: BorderSide.none,
                         ),
                       ),
                     ),
-
-                    const SizedBox(
-                        height: 20),
-
+                    const SizedBox(height: 15),
                     Row(
-
                       children: [
-
                         Expanded(
-
-                          child:
-                          tarjetaResumen(
-
+                          child: InkWell(
+                            onTap: () => _seleccionarFechaHistorial(context),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).cardColor,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.calendar_today, color: Color(0xFFD9A5B3), size: 20),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      '${fechaSeleccionada.day}/${fechaSeleccionada.month}/${fechaSeleccionada.year}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (esAdmin) ...[
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).cardColor,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: sedeSeleccionada,
+                                  icon: const Icon(Icons.arrow_drop_down, color: Color(0xFFD9A5B3)),
+                                  style: TextStyle(
+                                    color: Theme.of(context).textTheme.bodyMedium?.color,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                  isExpanded: true,
+                                  items: const [
+                                    DropdownMenuItem(
+                                      value: 'Todas',
+                                      child: Text('Todas las sedes'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'Comas',
+                                      child: Text('Comas'),
+                                    ),
+                                    DropdownMenuItem(
+                                      value: 'Carabayllo',
+                                      child: Text('Carabayllo'),
+                                    ),
+                                  ],
+                                  onChanged: (value) {
+                                    setState(() {
+                                      sedeSeleccionada = value ?? 'Todas';
+                                    });
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 15),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: tarjetaResumen(
                             'Pendientes',
-
-                            totalPendientes
-                                .toString(),
-
+                            totalPendientes.toString(),
                             const Color(0xFFD9A5B3),
                           ),
                         ),
-
-                        const SizedBox(
-                            width: 10),
-
+                        const SizedBox(width: 10),
                         Expanded(
-
-                          child:
-                          tarjetaResumen(
-
+                          child: tarjetaResumen(
                             'Confirmadas',
-
-                            totalConfirmadas
-                                .toString(),
-
+                            totalConfirmadas.toString(),
                             const Color(0xFF7E9CCB),
                           ),
                         ),
                       ],
                     ),
-
-                    const SizedBox(
-                        height: 10),
-
+                    const SizedBox(height: 10),
                     Row(
-
                       children: [
-
                         Expanded(
-
-                          child:
-                          tarjetaResumen(
-
+                          child: tarjetaResumen(
                             'Finalizadas',
-
-                            totalFinalizadas
-                                .toString(),
-
+                            totalFinalizadas.toString(),
                             const Color(0xFF7BAE8D),
                           ),
                         ),
-
-                        const SizedBox(
-                            width: 10),
-
+                        const SizedBox(width: 10),
                         Expanded(
-
-                          child:
-                          tarjetaResumen(
-
+                          child: tarjetaResumen(
                             'Ingresos',
-
                             'S/ ${ingresos.toStringAsFixed(0)}',
-
                             const Color(0xFFB58AB8),
                           ),
                         ),
                       ],
                     ),
-
-                    const SizedBox(
-                        height: 10),
-
+                    const SizedBox(height: 10),
                     SizedBox(
-
-                      width:
-                      double.infinity,
-
+                      width: double.infinity,
                       height: 55,
-
-                      child:
-                      ElevatedButton.icon(
-
+                      child: ElevatedButton.icon(
                         onPressed: () {
-
-                          exportarExcel(
-                            citasLista,
-                          );
+                          exportarExcel(citasLista);
                         },
-
-                        style:
-                        ElevatedButton.styleFrom(
-
-                          backgroundColor:
-                          Colors.green,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
                         ),
-
                         icon: const Icon(
-
                           Icons.table_chart,
-
-                          color:
-                          Colors.white,
+                          color: Colors.white,
                         ),
-
                         label: const Text(
-
                           'Exportar Excel',
-
-                          style: TextStyle(
-                            color: Colors.white,
-                          ),
+                          style: TextStyle(color: Colors.white),
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-
               Expanded(
-
-                child: ListView.builder(
-
-                  padding:
-                  const EdgeInsets.all(
-                      15),
-
-                  itemCount:
-                  citasLista.length,
-
-                  itemBuilder:
-                      (context, index) {
-
-                    final cita =
-                    citasLista[index];
-
-                    return Container(
-
-                      margin:
-                      const EdgeInsets.only(
-                        bottom: 18,
-                      ),
-
-                      decoration:
-                      BoxDecoration(
-
-                        color:
-                        Theme.of(context)
-                            .cardColor,
-
-                        borderRadius:
-                        BorderRadius.circular(
-                            25),
-
-                        boxShadow: [
-
-                          BoxShadow(
-
-                            color:
-                            Colors.black
-                                .withOpacity(
-                                0.05),
-
-                            blurRadius: 10,
-
-                            offset:
-                            const Offset(
-                                0,
-                                4),
-                          ),
-                        ],
-                      ),
-
-                      child: Padding(
-
-                        padding:
-                        const EdgeInsets.all(
-                            18),
-
-                        child: Column(
-
-                          crossAxisAlignment:
-                          CrossAxisAlignment
-                              .start,
-
-                          children: [
-
-                            Row(
-
-                              children: [
-
-                                CircleAvatar(
-
-                                  radius: 28,
-
-                                  backgroundColor:
-                                  colorEstado(
-
-                                    cita['estado'],
-                                  ),
-
-                                  child: Icon(
-
-                                    iconoEstado(
-
-                                      cita['estado'],
-                                    ),
-
-                                    color:
-                                    Colors.white,
-                                  ),
-                                ),
-
-                                const SizedBox(
-                                    width: 15),
-
-                                Expanded(
-
-                                  child: Column(
-
-                                    crossAxisAlignment:
-                                    CrossAxisAlignment
-                                        .start,
-
-                                    children: [
-
-                                      Text(
-
-                                        cita['cliente'],
-
-                                        style:
-                                        const TextStyle(
-
-                                          fontWeight:
-                                          FontWeight.bold,
-
-                                          fontSize:
-                                          20,
-                                        ),
-                                      ),
-
-                                      const SizedBox(
-                                          height:
-                                          5),
-
-                                      Text(
-                                        cita['servicio'],
-                                      ),
-
-                                      Text(
-                                        '👩 ${cita['trabajadora']}',
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                Container(
-
-                                  padding:
-                                  const EdgeInsets.symmetric(
-
-                                    horizontal:
-                                    12,
-
-                                    vertical:
-                                    8,
-                                  ),
-
-                                  decoration:
-                                  BoxDecoration(
-
-                                    color:
-                                    colorEstado(
-
-                                      cita['estado'],
-                                    ),
-
-                                    borderRadius:
-                                    BorderRadius.circular(
-                                        20),
-                                  ),
-
-                                  child: Text(
-
-                                    cita['estado']
-                                        .toUpperCase(),
-
-                                    style:
-                                    const TextStyle(
-
-                                      color:
-                                      Colors.white,
-
-                                      fontWeight:
-                                      FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-
-                            const SizedBox(
-                                height: 18),
-
-                            Text(
-                              '📅 ${cita['fecha']}',
-                            ),
-
-                            Text(
-                              '⏰ ${cita['hora']}',
-                            ),
-
-                            Text(
-                              '📞 ${cita['telefono']}',
-                            ),
-
-                            Text(
-                              '💰 S/ ${cita['precio']}',
-                            ),
-
-                            const SizedBox(
-                                height: 18),
-
-                            Wrap(
-
-                              spacing: 10,
-
-                              runSpacing: 10,
-
-                              children: [
-
-                                ElevatedButton.icon(
-
-                                  style:
-                                  ElevatedButton.styleFrom(
-
-                                    backgroundColor:
-                                    Colors.blue,
-                                  ),
-
-                                  onPressed: () {
-
-                                    cambiarEstado(
-
-                                      cita['id'],
-
-                                      'confirmada',
-                                    );
-                                  },
-
-                                  icon: const Icon(
-
-                                    Icons.check,
-
-                                    color:
-                                    Colors.white,
-                                  ),
-
-                                  label: const Text(
-
-                                    'Confirmar',
-
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-
-                                ElevatedButton.icon(
-
-                                  style:
-                                  ElevatedButton.styleFrom(
-
-                                    backgroundColor:
-                                    Colors.green,
-                                  ),
-
-                                  onPressed: () {
-
-                                    cambiarEstado(
-
-                                      cita['id'],
-
-                                      'finalizada',
-                                    );
-                                  },
-
-                                  icon: const Icon(
-
-                                    Icons.done_all,
-
-                                    color:
-                                    Colors.white,
-                                  ),
-
-                                  label: const Text(
-
-                                    'Finalizar',
-
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-
-                                ElevatedButton.icon(
-
-                                  style:
-                                  ElevatedButton.styleFrom(
-
-                                    backgroundColor:
-                                    Colors.green.shade700,
-                                  ),
-
-                                  onPressed: () {
-
-                                    enviarWhatsApp(
-
-                                      cita['telefono'],
-
-                                      cita['cliente'],
-
-                                      cita['fecha'],
-
-                                      cita['hora'],
-
-                                      cita['servicio'],
-                                    );
-                                  },
-
-                                  icon: const Icon(
-
-                                    Icons.message,
-
-                                    color:
-                                    Colors.white,
-                                  ),
-
-                                  label: const Text(
-
-                                    'WhatsApp',
-
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-
-                                ElevatedButton.icon(
-
-                                  style:
-                                  ElevatedButton.styleFrom(
-
-                                    backgroundColor:
-                                    Colors.deepOrange,
-                                  ),
-
-                                  onPressed: () {
-
-                                    generarPDF(
-                                      cita,
-                                    );
-                                  },
-
-                                  icon: const Icon(
-
-                                    Icons.picture_as_pdf,
-
-                                    color:
-                                    Colors.white,
-                                  ),
-
-                                  label: const Text(
-
-                                    'PDF',
-
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-
-                                ElevatedButton.icon(
-
-                                  style:
-                                  ElevatedButton.styleFrom(
-
-                                    backgroundColor:
-                                    Colors.red,
-                                  ),
-
-                                  onPressed: () {
-
-                                    eliminarCita(
-                                      cita['id'],
-                                    );
-                                  },
-
-                                  icon: const Icon(
-
-                                    Icons.delete,
-
-                                    color:
-                                    Colors.white,
-                                  ),
-
-                                  label: const Text(
-
-                                    'Eliminar',
-
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
+                child: citasLista.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'No hay citas con ese filtro',
+                          style: TextStyle(color: Colors.grey),
                         ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(15, 15, 15, 90),
+                        itemCount: citasLista.length,
+                        itemBuilder: (context, index) {
+                          return tarjetaHistorialCita(citasLista[index]);
+                        },
                       ),
-                    );
-                  },
-                ),
               ),
             ],
           );
@@ -1011,68 +554,228 @@ class _HistorialScreenState
     );
   }
 
-  Widget tarjetaResumen(
-
-      String titulo,
-      String valor,
-      Color color,
-
-      ) {
-
+  Widget tarjetaResumen(String titulo, String valor, Color color) {
     return Container(
-
-      padding:
-      const EdgeInsets.all(
-          18),
-
-      decoration:
-      BoxDecoration(
-
-        color:
-        color.withOpacity(0.18),
-
-        borderRadius:
-        BorderRadius.circular(
-            20),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(20),
       ),
-
       child: Column(
-
         children: [
-
           Text(
-
             valor,
-
             style: TextStyle(
-
-              color:
-              color,
-
+              color: color,
               fontSize: 22,
-
-              fontWeight:
-              FontWeight.bold,
+              fontWeight: FontWeight.bold,
             ),
           ),
-
-          const SizedBox(
-              height: 5),
-
+          const SizedBox(height: 5),
           Text(
-
             titulo,
-
             style: TextStyle(
-
-              color:
-              color,
-
-              fontWeight:
-              FontWeight.w600,
+              color: color,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget tarjetaHistorialCita(Map<String, dynamic> cita) {
+    final estado = (cita['estado'] ?? 'pendiente').toString();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 18),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 28,
+                  backgroundColor: colorEstado(estado).withOpacity(0.18),
+                  child: Icon(
+                    iconoEstado(estado),
+                    color: colorEstado(estado),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Clienta',
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 13,
+                        ),
+                      ),
+                      Text(
+                        (cita['cliente'] ?? '').toString(),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorEstado(estado),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    estado.toUpperCase(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            datoCita('Servicio', cita['servicio']),
+            datoCita('Trabajadora asignada', cita['trabajadora']),
+            datoCita('Sede', cita['sede']),
+            datoCita('Fecha', cita['fecha']),
+            datoCita('Horario', rangoHora(cita)),
+            datoCita('Telefono', cita['telefono']),
+            datoCita('Precio', 'S/ ${cita['precio']}'),
+            datoCita(
+              'Adelanto',
+              'S/ ${cita['adelanto']} - ${cita['estadoPago']}',
+            ),
+            if ((cita['observaciones'] ?? '').toString().trim().isNotEmpty)
+              datoCita('Nota', cita['observaciones']),
+            const SizedBox(height: 18),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                if (cita['estado'] != 'cancelada' && cita['estado'] != 'finalizada')
+                  botonAccion(
+                    texto: 'Cancelar',
+                    icono: Icons.cancel,
+                    color: Colors.red.shade700,
+                    onPressed: () {
+                      cambiarEstado(cita['id'], 'cancelada');
+                    },
+                  ),
+                botonAccion(
+                  texto: 'Confirmar',
+                  icono: Icons.check,
+                  color: Colors.blue,
+                  onPressed: () {
+                    cambiarEstado(cita['id'], 'confirmada');
+                  },
+                ),
+                botonAccion(
+                  texto: 'Finalizar',
+                  icono: Icons.done_all,
+                  color: Colors.green,
+                  onPressed: () {
+                    cambiarEstado(cita['id'], 'finalizada');
+                  },
+                ),
+
+                if (puedeEditarCitas)
+                  botonAccion(
+                    texto: 'Editar',
+                    icono: Icons.edit,
+                    color: const Color(0xFFB58AB8),
+                    onPressed: () {
+                      abrirEdicionCita(cita);
+                    },
+                  ),
+                if (esAdmin)
+                  botonAccion(
+                    texto: 'PDF',
+                    icono: Icons.picture_as_pdf,
+                    color: Colors.deepOrange,
+                    onPressed: () {
+                      generarPDF(cita);
+                    },
+                  ),
+                if (esAdmin)
+                  botonAccion(
+                    texto: 'Eliminar',
+                    icono: Icons.delete,
+                    color: Colors.red,
+                    onPressed: () {
+                      eliminarCita(cita['id']);
+                    },
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget datoCita(String etiqueta, Object? valor) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 5),
+      child: RichText(
+        text: TextSpan(
+          style: TextStyle(
+            color: Theme.of(context).textTheme.bodyMedium?.color,
+            fontSize: 14,
+          ),
+          children: [
+            TextSpan(
+              text: '$etiqueta: ',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            TextSpan(text: (valor ?? '').toString()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget botonAccion({
+    required String texto,
+    required IconData icono,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return ElevatedButton.icon(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+      ),
+      onPressed: onPressed,
+      icon: Icon(
+        icono,
+        color: Colors.white,
+      ),
+      label: Text(
+        texto,
+        style: const TextStyle(color: Colors.white),
       ),
     );
   }

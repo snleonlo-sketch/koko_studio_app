@@ -76,29 +76,50 @@ class _ServiciosClienteScreenState
     }
   }
 
-  Future<void> consultarServicio(
-      String servicio) async {
+  Future<void> consultarServicio(String servicio) async {
+    final nombre = nombreCliente.isNotEmpty ? nombreCliente : 'cliente';
 
-    final nombre =
-        nombreCliente.isNotEmpty
-            ? nombreCliente
-            : 'cliente';
-
-    final mensaje =
-        'Hola Koko Studio, soy $nombre.\n\n'
+    final mensaje = 'Hola Koko Studio, soy $nombre.\n\n'
         'Quisiera consultar por el servicio: $servicio.\n'
         'Sede de interes: $sedeSeleccionada.\n'
         'Me gustaria recibir orientacion sobre disponibilidad, '
         'tiempo aproximado y precio segun mi diseno.';
 
+    String numeroDestino = KokoConfig.whatsappPorSede(sedeSeleccionada);
+    try {
+      final snapshot = await database.child('trabajadoras').get();
+      if (snapshot.exists && snapshot.value != null) {
+        final Map trabajadorasMap = snapshot.value as Map;
+        for (var entry in trabajadorasMap.values) {
+          final Map map = entry as Map;
+          final rol = (map['rol'] ?? '').toString().toLowerCase();
+          final sede = (map['sede'] ?? '').toString().toLowerCase();
+          final tel = (map['telefono'] ?? '').toString().trim();
+          if (rol == 'recepcionista' &&
+              sede == sedeSeleccionada.toLowerCase() &&
+              tel.isNotEmpty) {
+            String cleanTel = tel.replaceAll(RegExp(r'[^0-9]'), '');
+            if (cleanTel.length == 9) {
+              cleanTel = '51$cleanTel';
+            }
+            if (cleanTel.isNotEmpty) {
+              numeroDestino = cleanTel;
+              break;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('Error al obtener numero de recepcionista: $e');
+    }
+
+    final uri = Uri.parse(
+      'https://wa.me/$numeroDestino?text=${Uri.encodeComponent(mensaje)}',
+    );
+
     await launchUrl(
-
-      KokoConfig.whatsappUri(
-        mensaje: mensaje,
-      ),
-
-      mode:
-      LaunchMode.externalApplication,
+      uri,
+      mode: LaunchMode.externalApplication,
     );
   }
 
@@ -332,6 +353,20 @@ class _ServiciosClienteScreenState
                   List items =
                   servicios.entries
                       .toList();
+
+                  items =
+                      items.where((item) {
+
+                    final servicio =
+                        item.value;
+
+                    final sede =
+                        (servicio['sede'] ?? '')
+                            .toString();
+
+                    return sede.isEmpty ||
+                        sede == sedeSeleccionada;
+                  }).toList();
 
                   if (textoBusqueda
                       .isNotEmpty) {
@@ -595,8 +630,6 @@ class _ServiciosClienteScreenState
                         consultarServicio(
                           servicio['nombre'] ?? '',
                         );
-
-                        return;
 
                         ScaffoldMessenger
                             .of(context)

@@ -44,7 +44,7 @@ class _DashboardClienteScreenState
 
   int totalServicios = 0;
 
-  int citasPendientes = 0;
+  int citasConfirmadas = 0;
 
   String sedeSeleccionada =
       KokoConfig.sedes.first;
@@ -65,54 +65,7 @@ class _DashboardClienteScreenState
 
     if (uid == null) return;
 
-    // DATOS CLIENTE
-
-    final usuarioSnapshot =
-
-    await database
-        .child('usuarios')
-        .child(uid)
-        .get();
-
-    if (usuarioSnapshot.exists) {
-
-      Map datos =
-      usuarioSnapshot.value as Map;
-
-      nombreCliente =
-          datos['nombre'] ?? '';
-
-      telefonoCliente =
-          datos['telefono'] ?? '';
-
-      sedeSeleccionada =
-          datos['sedePreferida'] ??
-              KokoConfig.sedes.first;
-    }
-
-    // SERVICIOS
-
-    database
-        .child('servicios')
-        .onValue
-        .listen((event) {
-
-      final data =
-          event.snapshot.value;
-
-      totalServicios = 0;
-
-      if (data != null) {
-
-        Map servicios =
-        data as Map;
-
-        totalServicios =
-            servicios.length;
-      }
-
-      setState(() {});
-    });
+    await recargarDatosCliente();
 
     // CITAS CLIENTE
 
@@ -126,7 +79,12 @@ class _DashboardClienteScreenState
 
       totalReservas = 0;
 
-      citasPendientes = 0;
+      totalServicios = 0;
+
+      citasConfirmadas = 0;
+
+      final serviciosCliente =
+      <String>{};
 
       if (data != null) {
 
@@ -159,19 +117,65 @@ class _DashboardClienteScreenState
 
             totalReservas++;
 
-            if (value['estado']
-                == 'pendiente') {
+            final servicio =
+                (value['servicio'] ?? '')
+                    .toString();
 
-              citasPendientes++;
+            if (servicio.isNotEmpty) {
+
+              serviciosCliente.add(servicio);
+            }
+
+            if (value['estado']
+                == 'confirmada') {
+
+              citasConfirmadas++;
             }
           }
         });
+
+        totalServicios =
+            serviciosCliente.length;
       }
 
       setState(() {});
     });
 
     setState(() {});
+  }
+
+  Future<void> recargarDatosCliente() async {
+
+    final uid =
+        usuario?.uid;
+
+    if (uid == null) return;
+
+    final usuarioSnapshot =
+
+    await database
+        .child('usuarios')
+        .child(uid)
+        .get();
+
+    if (usuarioSnapshot.exists) {
+
+      Map datos =
+      usuarioSnapshot.value as Map;
+
+      setState(() {
+
+        nombreCliente =
+            datos['nombre'] ?? '';
+
+        telefonoCliente =
+            datos['telefono'] ?? '';
+
+        sedeSeleccionada =
+            datos['sedePreferida'] ??
+                KokoConfig.sedes.first;
+      });
+    }
   }
 
   Future<void> guardarSede(
@@ -197,31 +201,51 @@ class _DashboardClienteScreenState
   }
 
   Future<void> solicitarPorWhatsApp({
-
     String? servicio,
-
   }) async {
+    final nombre = nombreCliente.isNotEmpty ? nombreCliente : 'cliente';
 
-    final nombre =
-        nombreCliente.isNotEmpty
-            ? nombreCliente
-            : 'cliente';
-
-    final mensaje =
-        'Hola Koko Studio, soy $nombre.\n\n'
+    final mensaje = 'Hola Koko Studio, soy $nombre.\n\n'
         'Quisiera consultar una cita en la sede $sedeSeleccionada.\n'
         '${servicio != null ? 'Servicio de interes: $servicio.\n' : ''}'
         'Me gustaria recibir orientacion sobre disponibilidad, '
         'tiempo aproximado y precio segun el diseno.';
 
+    String numeroDestino = KokoConfig.whatsappPorSede(sedeSeleccionada);
+    try {
+      final snapshot = await database.child('trabajadoras').get();
+      if (snapshot.exists && snapshot.value != null) {
+        final Map trabajadorasMap = snapshot.value as Map;
+        for (var entry in trabajadorasMap.values) {
+          final Map map = entry as Map;
+          final rol = (map['rol'] ?? '').toString().toLowerCase();
+          final sede = (map['sede'] ?? '').toString().toLowerCase();
+          final tel = (map['telefono'] ?? '').toString().trim();
+          if (rol == 'recepcionista' &&
+              sede == sedeSeleccionada.toLowerCase() &&
+              tel.isNotEmpty) {
+            String cleanTel = tel.replaceAll(RegExp(r'[^0-9]'), '');
+            if (cleanTel.length == 9) {
+              cleanTel = '51$cleanTel';
+            }
+            if (cleanTel.isNotEmpty) {
+              numeroDestino = cleanTel;
+              break;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('Error al obtener numero de recepcionista: $e');
+    }
+
+    final uri = Uri.parse(
+      'https://wa.me/$numeroDestino?text=${Uri.encodeComponent(mensaje)}',
+    );
+
     await launchUrl(
-
-      KokoConfig.whatsappUri(
-        mensaje: mensaje,
-      ),
-
-      mode:
-      LaunchMode.externalApplication,
+      uri,
+      mode: LaunchMode.externalApplication,
     );
   }
 
@@ -242,7 +266,11 @@ class _DashboardClienteScreenState
 
       drawer: Drawer(
 
-        child: Column(
+        child: SafeArea(
+
+          bottom: true,
+
+          child: Column(
 
           children: [
 
@@ -397,8 +425,9 @@ class _DashboardClienteScreenState
               },
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 24),
           ],
+        ),
         ),
       ),
 
@@ -434,7 +463,10 @@ class _DashboardClienteScreenState
 
                   const ProfileScreen(),
                 ),
-              );
+              ).then((_) {
+
+                recargarDatosCliente();
+              });
             },
 
             icon: const Icon(
@@ -763,9 +795,9 @@ class _DashboardClienteScreenState
 
                       context,
 
-                      'Pendientes',
+                      'Confirmadas',
 
-                      citasPendientes
+                      citasConfirmadas
                           .toString(),
 
                       Icons.access_time,
@@ -1349,6 +1381,21 @@ class _DashboardClienteScreenState
 
           const SizedBox(height: 15),
 
+          const Text(
+
+            KokoConfig.introCondiciones,
+
+            style: TextStyle(
+
+              fontSize: 15,
+
+              color:
+              Colors.grey,
+            ),
+          ),
+
+          const SizedBox(height: 15),
+
           ...KokoConfig.condicionesCita.map((condicion) {
 
             return Padding(
@@ -1394,57 +1441,6 @@ class _DashboardClienteScreenState
               ),
             );
           }),
-
-          const SizedBox(height: 10),
-
-          SizedBox(
-
-            width: double.infinity,
-
-            child: ElevatedButton.icon(
-
-              onPressed:
-              solicitarPorWhatsApp,
-
-              style:
-              ElevatedButton.styleFrom(
-
-                backgroundColor:
-                Colors.green.shade700,
-
-                shape:
-                RoundedRectangleBorder(
-
-                  borderRadius:
-                  BorderRadius.circular(15),
-                ),
-              ),
-
-              icon:
-              const Icon(
-
-                Icons.message,
-
-                color:
-                Colors.white,
-              ),
-
-              label:
-              const Text(
-
-                'Consultar por WhatsApp',
-
-                style: TextStyle(
-
-                  color:
-                  Colors.white,
-
-                  fontWeight:
-                  FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );

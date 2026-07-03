@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 import '../utils/koko_config.dart';
+import '../services/role_service.dart';
 
 import 'login_screen.dart';
 
@@ -27,7 +28,12 @@ class _ProfileScreenState
   final DatabaseReference database =
   FirebaseDatabase.instance.ref();
 
+  final RoleService roleService =
+      RoleService();
+
   String nombre = '';
+
+  String telefono = '';
 
   String rol = '';
 
@@ -50,28 +56,22 @@ class _ProfileScreenState
 
       if (user != null) {
 
-        final snapshot =
-
-        await database
-            .child('usuarios')
-            .child(user!.uid)
-            .get();
-
-        if (snapshot.exists) {
-
-          Map datos =
-          snapshot.value as Map;
+        final datos =
+            await roleService.obtenerDatosUsuario();
 
           nombre =
               datos['nombre'] ?? '';
+
+          telefono =
+              datos['telefono'] ?? '';
 
           rol =
               datos['rol'] ?? '';
 
           sedePreferida =
               datos['sedePreferida'] ??
+                  datos['sede'] ??
                   KokoConfig.sedes.first;
-        }
       }
 
       setState(() {
@@ -309,7 +309,9 @@ class _ProfileScreenState
 
                       'Teléfono',
 
-                      '+51 999 999 999',
+                      telefono.isEmpty
+                          ? 'Sin telefono registrado'
+                          : telefono,
                     ),
 
                     const Divider(),
@@ -464,6 +466,8 @@ class _ProfileScreenState
                   ),
                 ),
               ),
+
+              const SizedBox(height: 90),
             ],
           ),
         ),

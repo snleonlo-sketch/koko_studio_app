@@ -10,10 +10,8 @@ import '../services/role_service.dart';
 
 import 'citas_screen.dart';
 import 'calendario_screen.dart';
-import 'historial_screen.dart';
 import 'profile_screen.dart';
 import 'pagos_screen.dart';
-import 'servicios_screen.dart';
 import 'clientas_atendidas_screen.dart';
 
 class DashboardTrabajadoraScreen
@@ -43,101 +41,22 @@ class _DashboardTrabajadoraScreenState
 
   String nombreTrabajadora = '';
 
-  int totalCitas = 0;
-
-  int totalServicios = 0;
-
-  double ingresos = 0;
+  String sedeTrabajadora = '';
 
   @override
   void initState() {
-
     super.initState();
-
-    iniciarResumen();
+    cargarDatosTrabajadora();
   }
 
-  Future<void> iniciarResumen() async {
-
-    final datos =
-    await roleService.obtenerDatosUsuario();
-
-    nombreTrabajadora =
-        datos['nombre'] ?? '';
-
-    cargarResumen();
-  }
-
-  void cargarResumen() {
-
-    database
-        .child('citas')
-        .onValue
-        .listen((event) {
-
-      final data =
-          event.snapshot.value;
-
-      totalCitas = 0;
-
-      ingresos = 0;
-
-      if (data != null) {
-
-        Map citas =
-        data as Map;
-
-        citas.forEach((key, value) {
-
-          final esSuCita =
-              (value['trabajadora'] ?? '')
-                  .toString()
-                  .toLowerCase() ==
-                  nombreTrabajadora.toLowerCase();
-
-          if (!esSuCita) return;
-
-          totalCitas++;
-
-          if (value['estado'] ==
-              'finalizada') {
-
-            ingresos +=
-                double.tryParse(
-
-                  value['precio']
-                      .toString(),
-
-                ) ??
-                    0;
-          }
-        });
-      }
-
-      setState(() {});
-    });
-
-    database
-        .child('servicios')
-        .onValue
-        .listen((event) {
-
-      final data =
-          event.snapshot.value;
-
-      totalServicios = 0;
-
-      if (data != null) {
-
-        Map servicios =
-        data as Map;
-
-        totalServicios =
-            servicios.length;
-      }
-
-      setState(() {});
-    });
+  Future<void> cargarDatosTrabajadora() async {
+    final datos = await roleService.obtenerDatosUsuario();
+    if (mounted) {
+      setState(() {
+        nombreTrabajadora = datos['nombre'] ?? '';
+        sedeTrabajadora = datos['sede'] ?? '';
+      });
+    }
   }
 
   @override
@@ -157,7 +76,11 @@ class _DashboardTrabajadoraScreenState
 
       drawer: Drawer(
 
-        child: Column(
+        child: SafeArea(
+
+          bottom: true,
+
+          child: Column(
 
           children: [
 
@@ -253,17 +176,6 @@ class _DashboardTrabajadoraScreenState
 
               context,
 
-              Icons.design_services,
-
-              'Servicios',
-
-              const ServiciosScreen(),
-            ),
-
-            drawerItem(
-
-              context,
-
               Icons.history,
 
               'Clientas Atendidas',
@@ -280,17 +192,6 @@ class _DashboardTrabajadoraScreenState
               'Método de Pago',
 
               const PagosScreen(),
-            ),
-
-            drawerItem(
-
-              context,
-
-              Icons.person,
-
-              'Mi Perfil',
-
-              const ProfileScreen(),
             ),
 
             const Spacer(),
@@ -322,8 +223,9 @@ class _DashboardTrabajadoraScreenState
               },
             ),
 
-            const SizedBox(height: 10),
+            const SizedBox(height: 24),
           ],
+        ),
         ),
       ),
 
@@ -593,17 +495,6 @@ class _DashboardTrabajadoraScreenState
 
                     context,
 
-                    'Servicios',
-
-                    Icons.design_services,
-
-                    const ServiciosScreen(),
-                  ),
-
-                  itemMenu(
-
-                    context,
-
                     'Clientas Atendidas',
 
                     Icons.people,
@@ -622,122 +513,6 @@ class _DashboardTrabajadoraScreenState
                     const PagosScreen(),
                   ),
 
-                  itemMenu(
-
-                    context,
-
-                    'Mi Perfil',
-
-                    Icons.person,
-
-                    const ProfileScreen(),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 30),
-
-              // RESUMEN
-
-              const Text(
-
-                'Resumen de tu trabajo',
-
-                style: TextStyle(
-
-                  fontSize: 24,
-
-                  fontWeight:
-                  FontWeight.bold,
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              Row(
-
-                children: [
-
-                  Expanded(
-
-                    child: resumenCard(
-
-                      context,
-
-                      'Citas',
-
-                      totalCitas
-                          .toString(),
-
-                      Icons.calendar_month,
-
-                      Colors.pink,
-                    ),
-                  ),
-
-                  const SizedBox(
-                      width: 15),
-
-                  Expanded(
-
-                    child: resumenCard(
-
-                      context,
-
-                      'Servicios',
-
-                      totalServicios
-                          .toString(),
-
-                      Icons.design_services,
-
-                      Colors.orange,
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 15),
-
-              Row(
-
-                children: [
-
-                  Expanded(
-
-                    child: resumenCard(
-
-                      context,
-
-                      'Ingresos',
-
-                      'S/ ${ingresos.toStringAsFixed(0)}',
-
-                      Icons.attach_money,
-
-                      Colors.green,
-                    ),
-                  ),
-
-                  const SizedBox(
-                      width: 15),
-
-                  Expanded(
-
-                    child: resumenCard(
-
-                      context,
-
-                      'Atendidas',
-
-                      totalCitas
-                          .toString(),
-
-                      Icons.people,
-
-                      Colors.purple,
-                    ),
-                  ),
                 ],
               ),
 
@@ -964,105 +739,7 @@ class _DashboardTrabajadoraScreenState
     );
   }
 
-  Widget resumenCard(
 
-      BuildContext context,
-
-      String titulo,
-      String valor,
-      IconData icono,
-      Color color,
-
-      ) {
-
-    return Container(
-
-      padding:
-      const EdgeInsets.all(20),
-
-      decoration:
-      BoxDecoration(
-
-        color:
-        Theme.of(context)
-            .cardColor,
-
-        borderRadius:
-        BorderRadius.circular(
-            25),
-
-        boxShadow: [
-
-          BoxShadow(
-
-            color:
-            Colors.black
-                .withOpacity(
-                0.05),
-
-            blurRadius: 10,
-
-            offset:
-            const Offset(0, 4),
-          ),
-        ],
-      ),
-
-      child: Column(
-
-        children: [
-
-          CircleAvatar(
-
-            radius: 24,
-
-            backgroundColor:
-            color.withOpacity(0.15),
-
-            child: Icon(
-
-              icono,
-
-              color: color,
-            ),
-          ),
-
-          const SizedBox(height: 15),
-
-          Text(
-
-            valor,
-
-            style: TextStyle(
-
-              fontSize: 24,
-
-              fontWeight:
-              FontWeight.bold,
-
-              color: color,
-            ),
-          ),
-
-          const SizedBox(height: 5),
-
-          Text(
-
-            titulo,
-
-            style: TextStyle(
-
-              color:
-              Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget drawerItem(
 

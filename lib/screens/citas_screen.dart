@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
@@ -16,7 +17,12 @@ class CitasScreen extends StatefulWidget {
 
   const CitasScreen({
     super.key,
+    this.citaEditar,
+    this.motivoEdicion,
   });
+
+  final Map<String, dynamic>? citaEditar;
+  final String? motivoEdicion;
 
   @override
   State<CitasScreen> createState() =>
@@ -65,8 +71,10 @@ class _CitasScreenState
   String textoBusqueda = '';
 
   String rolUsuario = '';
-
   String nombreUsuario = '';
+
+  bool get puedeGestionarCitas =>
+      rolUsuario == 'admin' || rolUsuario == 'recepcionista';
 
   List<String> servicios = [];
 
@@ -80,6 +88,27 @@ class _CitasScreenState
       KokoConfig.sedes.first;
 
   bool adelantoPagado = false;
+  String? citaEditandoId;
+
+  List<Map<String, dynamic>> clientas = [];
+  StreamSubscription? _serviciosSub;
+  StreamSubscription? _trabajadorasSub;
+  StreamSubscription? _usuariosSub;
+
+  @override
+  void dispose() {
+    _serviciosSub?.cancel();
+    _trabajadorasSub?.cancel();
+    _usuariosSub?.cancel();
+    clienteController.dispose();
+    telefonoController.dispose();
+    fechaController.dispose();
+    horaController.dispose();
+    precioController.dispose();
+    observacionesController.dispose();
+    buscarController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -94,7 +123,36 @@ class _CitasScreenState
 
     await cargarUsuario();
 
+    cargarCitaParaEditar();
+
     cargarDatos();
+  }
+
+  void cargarCitaParaEditar() {
+    final cita = widget.citaEditar;
+    if (cita == null) return;
+
+    setState(() {
+      citaEditandoId = (cita['id'] ?? '').toString();
+      clienteController.text = (cita['cliente'] ?? '').toString();
+      telefonoController.text = (cita['telefono'] ?? '').toString();
+      fechaController.text = (cita['fecha'] ?? '').toString();
+      horaController.text = (cita['horaInicio'] ?? cita['hora'] ?? '').toString();
+      precioController.text = (cita['precio'] ?? '').toString();
+      observacionesController.text = (cita['observaciones'] ?? '').toString();
+      
+      final serv = (cita['servicio'] ?? '').toString();
+      if (serv.isNotEmpty && servicios.contains(serv)) {
+        servicioSeleccionado = serv;
+      }
+      
+      final trab = (cita['trabajadora'] ?? '').toString();
+      if (trab.isNotEmpty && trabajadoras.contains(trab)) {
+        trabajadoraSeleccionada = trab;
+      }
+
+      adelantoPagado = (cita['adelantoPagado'] == true);
+    });
   }
 
   Future<void>
@@ -111,12 +169,19 @@ class _CitasScreenState
     nombreUsuario =
         datos['nombre'] ?? '';
 
+    if (rolUsuario == 'recepcionista') {
+      final sede = datos['sede'] ?? '';
+      if (sede.isNotEmpty) {
+        sedeSeleccionada = sede;
+      }
+    }
+
     setState(() {});
   }
 
   void cargarDatos() {
 
-    database
+    _serviciosSub = database
         .child('servicios')
         .onValue
         .listen((event) {
@@ -135,11 +200,22 @@ class _CitasScreenState
                 e['nombre'].toString())
                 .toList();
 
+        if (!servicios.contains('Servicio Personalizado')) {
+          servicios.add('Servicio Personalizado');
+        }
+
+        if (widget.citaEditar != null) {
+          final serv = (widget.citaEditar!['servicio'] ?? '').toString();
+          if (servicios.contains(serv)) {
+            servicioSeleccionado = serv;
+          }
+        }
+
         setState(() {});
       }
     });
 
-    database
+    _trabajadorasSub = database
         .child('trabajadoras')
         .onValue
         .listen((event) {
@@ -154,11 +230,47 @@ class _CitasScreenState
 
         trabajadoras =
             trabajadorasMap.values
+                .where((e) => e is Map && e['rol'] != 'recepcionista')
                 .map<String>((e) =>
                 e['nombre'].toString())
                 .toList();
 
+        if (widget.citaEditar != null) {
+          final trab = (widget.citaEditar!['trabajadora'] ?? '').toString();
+          if (trabajadoras.contains(trab)) {
+            trabajadoraSeleccionada = trab;
+          }
+        }
+
         setState(() {});
+      }
+    });
+
+    _usuariosSub = database
+        .child('usuarios')
+        .onValue
+        .listen((event) {
+
+      final data = event.snapshot.value;
+      if (data != null) {
+        final Map temp = data as Map;
+        final List<Map<String, dynamic>> lista = [];
+        temp.forEach((key, value) {
+          if (value is Map &&
+              (value['rol'] ?? '').toString().toLowerCase() == 'cliente') {
+            lista.add({
+              'uid': key,
+              'nombre': (value['nombre'] ?? '').toString(),
+              'telefono': (value['telefono'] ?? '').toString(),
+              'correo': (value['correo'] ?? '').toString(),
+            });
+          }
+        });
+        if (mounted) {
+          setState(() {
+            clientas = lista;
+          });
+        }
       }
     });
   }
@@ -248,12 +360,11 @@ class _CitasScreenState
 
     try {
 
-      String id =
-
-      database
-          .child('citas')
-          .push()
-          .key!;
+      final String id = citaEditandoId ??
+          database
+              .child('citas')
+              .push()
+              .key!;
 
       await database
           .child('citas')
@@ -298,18 +409,19 @@ class _CitasScreenState
         'observaciones':
         observacionesController.text.trim(),
 
-        'estado':
-        'pendiente',
+        'estado': widget.citaEditar != null
+            ? (widget.citaEditar!['estado'] ?? 'pendiente')
+            : (adelantoPagado ? 'confirmada' : 'pendiente'),
       });
 
       await NotificationService
           .mostrarNotificacion(
 
         titulo:
-        'Nueva cita 💖',
+        citaEditandoId == null ? 'Nueva cita 💖' : 'Cita actualizada 💖',
 
         mensaje:
-        '${clienteController.text} registrada',
+        '${clienteController.text} ${citaEditandoId == null ? 'registrada' : 'actualizada'}',
       );
 
       AwesomeDialog(
@@ -322,7 +434,7 @@ class _CitasScreenState
         title: 'Éxito',
 
         desc:
-        'Cita registrada correctamente',
+        citaEditandoId == null ? 'Cita registrada correctamente' : 'Cita actualizada correctamente',
 
         btnOkOnPress: () {},
       ).show();
@@ -374,6 +486,7 @@ class _CitasScreenState
         KokoConfig.sedes.first;
 
     adelantoPagado = false;
+    citaEditandoId = null;
 
     setState(() {});
   }
@@ -572,7 +685,7 @@ class _CitasScreenState
 
         title: Text(
 
-          rolUsuario == 'admin'
+          puedeGestionarCitas
 
               ? 'Gestión de Citas'
 
@@ -587,7 +700,7 @@ class _CitasScreenState
 
         actions: [
 
-          if (rolUsuario == 'admin')
+          if (puedeGestionarCitas)
 
             IconButton(
 
@@ -603,7 +716,7 @@ class _CitasScreenState
 
       floatingActionButton:
 
-      rolUsuario == 'admin'
+      puedeGestionarCitas
 
           ? FloatingActionButton.extended(
 
@@ -655,7 +768,7 @@ class _CitasScreenState
 
             children: [
 
-              if (rolUsuario == 'admin') ...[
+              if (puedeGestionarCitas) ...[
 
                 Flexible(
 
@@ -716,15 +829,14 @@ class _CitasScreenState
                     );
                   }).toList(),
 
-                  onChanged: (value) {
-
-                    if (value == null) return;
-
-                    setState(() {
-
-                      sedeSeleccionada = value;
-                    });
-                  },
+                  onChanged: rolUsuario == 'recepcionista'
+                      ? null
+                      : (value) {
+                          if (value == null) return;
+                          setState(() {
+                            sedeSeleccionada = value;
+                          });
+                        },
                 ),
 
                 const SizedBox(height: 15),
@@ -953,11 +1065,10 @@ class _CitasScreenState
                       color: Colors.white,
                     )
 
-                        : const Text(
+                        : Text(
+                          citaEditandoId == null ? 'Guardar Cita' : 'Actualizar Cita',
 
-                      'Guardar Cita',
-
-                      style: TextStyle(
+                      style: const TextStyle(
 
                         color: Colors.white,
 
@@ -978,159 +1089,26 @@ class _CitasScreenState
                 ),
               ],
 
-              Expanded(
+              if (puedeGestionarCitas && textoBusqueda.trim().isNotEmpty)
+                Expanded(
+                  child: (() {
+                    final busqueda = textoBusqueda.trim().toLowerCase();
+                    final busquedaNumeros = textoBusqueda.replaceAll(RegExp(r'[^0-9]'), '');
 
-                child: StreamBuilder(
-
-                  stream:
-                  database
-                      .child('citas')
-                      .onValue,
-
-                  builder:
-                      (context, snapshot) {
-
-                    if (!snapshot.hasData) {
-
-                      return const Center(
-
-                        child:
-                        CircularProgressIndicator(),
-                      );
-                    }
-
-                    final data =
-                        snapshot.data!
-                            .snapshot
-                            .value;
-
-                    if (data == null) {
-
-                      return const Center(
-
-                        child: Text(
-                          'Aun no tienes citas programadas',
-                        ),
-                      );
-                    }
-
-                    Map citas =
-                    data as Map;
-
-                    if (rolUsuario == 'admin' &&
-                        textoBusqueda.trim().isEmpty) {
-
-                      return Center(
-
-                        child: Container(
-
-                          width:
-                          double.infinity,
-
-                          padding:
-                          const EdgeInsets.all(25),
-
-                          decoration:
-                          BoxDecoration(
-
-                            color:
-                            Theme.of(context)
-                                .cardColor,
-
-                            borderRadius:
-                            BorderRadius.circular(20),
-                          ),
-
-                          child:
-                          const Text(
-
-                            'Busca por nombre o celular para ver las citas registradas.',
-
-                            textAlign:
-                            TextAlign.center,
-
-                            style: TextStyle(
-
-                              color:
-                              Colors.grey,
-
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-
-                    List items =
-                    citas.entries.where((entry) {
-
-                      final cita =
-                          entry.value;
-
-                      if (rolUsuario == 'admin') {
-
-                        final cliente =
-                            (cita['cliente'] ?? '')
-                                .toString()
-                                .toLowerCase();
-
-                        final telefono =
-                            (cita['telefono'] ?? '')
-                                .toString()
-                                .replaceAll(
-                              RegExp(r'[^0-9]'),
-                              '',
-                            );
-
-                        final busqueda =
-                            textoBusqueda
-                                .trim()
-                                .toLowerCase();
-
-                        final busquedaNumeros =
-                            textoBusqueda
-                                .replaceAll(
-                              RegExp(r'[^0-9]'),
-                              '',
-                            );
-
-                        return cliente.contains(busqueda) ||
-                            (busquedaNumeros.isNotEmpty &&
-                                telefono.contains(
-                                  busquedaNumeros,
-                                ));
-                      }
-
-                      return cita['trabajadora']
-                          .toString()
-                          .toLowerCase()
-
-                          ==
-
-                          nombreUsuario
-                              .toLowerCase();
-
+                    final List<Map<String, dynamic>> filteredClientas = clientas.where((clienta) {
+                      final nombre = clienta['nombre']!.toLowerCase();
+                      final telefono = clienta['telefono']!.replaceAll(RegExp(r'[^0-9]'), '');
+                      return nombre.contains(busqueda) ||
+                          (busquedaNumeros.isNotEmpty && telefono.contains(busquedaNumeros));
                     }).toList();
 
-                    if (items.isEmpty) {
-
-                      return Center(
-
+                    if (filteredClientas.isEmpty) {
+                      return const Center(
                         child: Text(
-
-                          rolUsuario == 'admin'
-                              ? 'No se encontraron citas con esa busqueda'
-                              : 'Aun no tienes citas programadas',
-
-                          textAlign:
-                          TextAlign.center,
-
-                          style:
-                          const TextStyle(
-
-                            color:
-                            Colors.grey,
-
+                          'No se encontraron clientas con esa búsqueda',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.grey,
                             fontSize: 16,
                           ),
                         ),
@@ -1138,438 +1116,234 @@ class _CitasScreenState
                     }
 
                     return ListView.builder(
-
-                      itemCount:
-                      items.length,
-
-                      itemBuilder:
-                          (context, index) {
-
-                        final id =
-                            items[index].key;
-
-                        final cita =
-                            items[index].value;
-
+                      itemCount: filteredClientas.length,
+                      itemBuilder: (context, index) {
+                        final clienta = filteredClientas[index];
                         return Container(
-
-                          margin:
-                          const EdgeInsets.only(
-                            bottom: 18,
-                          ),
-
-                          decoration:
-                          BoxDecoration(
-
-                            color:
-                            Theme.of(context)
-                                .cardColor,
-
-                            borderRadius:
-                            BorderRadius.circular(
-                                25),
-
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).cardColor,
+                            borderRadius: BorderRadius.circular(15),
                             boxShadow: [
-
                               BoxShadow(
-
-                                color:
-                                Colors.black
-                                    .withOpacity(0.05),
-
+                                color: Colors.black.withOpacity(0.05),
                                 blurRadius: 10,
-
-                                offset:
-                                const Offset(0, 4),
+                                offset: const Offset(0, 4),
                               ),
                             ],
                           ),
-
-                          child: Padding(
-
-                            padding:
-                            const EdgeInsets.all(
-                                18),
-
-                            child: Column(
-
-                              crossAxisAlignment:
-                              CrossAxisAlignment.start,
-
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                            leading: const CircleAvatar(
+                              backgroundColor: Color(0xFFD9A5B3),
+                              child: Icon(Icons.person, color: Colors.white),
+                            ),
+                            title: Text(
+                              clienta['nombre'],
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-
-                                Row(
-
-                                  children: [
-
-                                    CircleAvatar(
-
-                                      radius: 28,
-
-                                      backgroundColor:
-                                      colorEstado(
-
-                                        cita['estado'],
-                                      ),
-
-                                      child: const Icon(
-
-                                        Icons.calendar_month,
-
-                                        color:
-                                        Colors.white,
-                                      ),
-                                    ),
-
-                                    const SizedBox(width: 15),
-
-                                    Expanded(
-
-                                      child: Column(
-
-                                        crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-
-                                        children: [
-
-                                          Text(
-
-                                            cita['cliente'],
-
-                                            style:
-                                            const TextStyle(
-
-                                              fontSize:
-                                              20,
-
-                                              fontWeight:
-                                              FontWeight.bold,
-                                            ),
-                                          ),
-
-                                          const SizedBox(height: 5),
-
-                                          Text(
-                                            cita['servicio'],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-
-                                    Container(
-
-                                      padding:
-                                      const EdgeInsets.symmetric(
-
-                                        horizontal:
-                                        12,
-
-                                        vertical:
-                                        8,
-                                      ),
-
-                                      decoration:
-                                      BoxDecoration(
-
-                                        color:
-                                        colorEstado(
-
-                                          cita['estado'],
-                                        ),
-
-                                        borderRadius:
-                                        BorderRadius.circular(
-                                            20),
-                                      ),
-
-                                      child: Text(
-
-                                        cita['estado']
-                                            .toString()
-                                            .toUpperCase(),
-
-                                        style:
-                                        const TextStyle(
-
-                                          color:
-                                          Colors.white,
-
-                                          fontWeight:
-                                          FontWeight.bold,
-
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 18),
-
-                                Text(
-                                  'Sede: ${cita['sede'] ?? 'No indicada'}',
-                                ),
-
-                                Text(
-                                  '📅 ${cita['fecha']}',
-                                ),
-
-                                Text(
-                                  '⏰ ${cita['hora']}',
-                                ),
-
-                                Text(
-                                  '👩 ${cita['trabajadora']}',
-                                ),
-
-                                Text(
-                                  '📞 ${cita['telefono']}',
-                                ),
-
-                                Text(
-                                  '💰 S/ ${cita['precio']}',
-                                ),
-
-                                Text(
-                                  'Adelanto: S/ ${cita['adelanto'] ?? '20'} - ${cita['estadoPago'] ?? 'pendiente'}',
-                                ),
-
-                                if ((cita['observaciones'] ?? '')
-                                    .toString()
-                                    .isNotEmpty)
-
-                                  Text(
-                                    'Notas: ${cita['observaciones']}',
-                                  ),
-
-                                const SizedBox(height: 18),
-
-                                Wrap(
-
-                                  spacing: 10,
-
-                                  runSpacing: 10,
-
-                                  children: [
-
-                                    ElevatedButton.icon(
-
-                                      style:
-                                      ElevatedButton.styleFrom(
-
-                                        backgroundColor:
-                                        Colors.blue,
-                                      ),
-
-                                      onPressed: () {
-
-                                        actualizarEstado(
-
-                                          id,
-
-                                          'confirmada',
-                                        );
-                                      },
-
-                                      icon: const Icon(
-
-                                        Icons.check,
-
-                                        color:
-                                        Colors.white,
-                                      ),
-
-                                      label: const Text(
-
-                                        'Confirmar',
-
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-
-                                    ElevatedButton.icon(
-
-                                      style:
-                                      ElevatedButton.styleFrom(
-
-                                        backgroundColor:
-                                        Colors.green,
-                                      ),
-
-                                      onPressed: () {
-
-                                        actualizarEstado(
-
-                                          id,
-
-                                          'finalizada',
-                                        );
-                                      },
-
-                                      icon: const Icon(
-
-                                        Icons.done_all,
-
-                                        color:
-                                        Colors.white,
-                                      ),
-
-                                      label: const Text(
-
-                                        'Finalizar',
-
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-
-                                    ElevatedButton.icon(
-
-                                      style:
-                                      ElevatedButton.styleFrom(
-
-                                        backgroundColor:
-                                        Colors.green.shade700,
-                                      ),
-
-                                      onPressed: () {
-
-                                        enviarWhatsApp(
-
-                                          cita['telefono'],
-
-                                          cita['cliente'],
-
-                                          cita['fecha'],
-
-                                          cita['hora'],
-
-                                          cita['servicio'],
-                                        );
-                                      },
-
-                                      icon: const Icon(
-
-                                        Icons.message,
-
-                                        color:
-                                        Colors.white,
-                                      ),
-
-                                      label: const Text(
-
-                                        'WhatsApp',
-
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-
-                                    ElevatedButton.icon(
-
-                                      style:
-                                      ElevatedButton.styleFrom(
-
-                                        backgroundColor:
-                                        Colors.red,
-                                      ),
-
-                                      onPressed:
-                                          () async {
-
-                                        eliminarCita(
-                                          id,
-                                        );
-                                      },
-
-                                      icon: const Icon(
-
-                                        Icons.delete,
-
-                                        color:
-                                        Colors.white,
-                                      ),
-
-                                      label: const Text(
-
-                                        'Eliminar',
-
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-
-                                    ElevatedButton.icon(
-
-                                      style:
-                                      ElevatedButton.styleFrom(
-
-                                        backgroundColor:
-                                        Colors.deepOrange,
-                                      ),
-
-                                      onPressed: () async {
-
-                                        final pdf =
-
-                                        await PdfService
-                                            .generarBoleta(
-
-                                          cliente:
-                                          cita['cliente'],
-
-                                          servicio:
-                                          cita['servicio'],
-
-                                          fecha:
-                                          cita['fecha'],
-
-                                          hora:
-                                          cita['hora'],
-
-                                          precio:
-                                          cita['precio'],
-                                        );
-
-                                        await Printing.layoutPdf(
-
-                                          onLayout: (format) async => pdf,
-                                        );
-                                      },
-
-                                      icon: const Icon(
-
-                                        Icons.picture_as_pdf,
-
-                                        color:
-                                        Colors.white,
-                                      ),
-
-                                      label: const Text(
-
-                                        'PDF',
-
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                const SizedBox(height: 4),
+                                Text('📞 ${clienta['telefono']}'),
+                                if (clienta['correo'].isNotEmpty) Text('✉️ ${clienta['correo']}'),
                               ],
                             ),
+                            trailing: const Icon(Icons.check_circle_outline, color: Color(0xFFD9A5B3)),
+                            onTap: () {
+                              setState(() {
+                                clienteController.text = clienta['nombre'];
+                                telefonoController.text = clienta['telefono'];
+                                buscarController.clear();
+                                textoBusqueda = '';
+                              });
+                              FocusScope.of(context).unfocus();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Clienta seleccionada: ${clienta['nombre']}'),
+                                  backgroundColor: const Color(0xFFD9A5B3),
+                                ),
+                              );
+                            },
                           ),
                         );
                       },
                     );
-                  },
+                  })(),
                 ),
-              ),
+
+              if (!puedeGestionarCitas)
+                Expanded(
+                  child: StreamBuilder(
+                    stream: database.child('citas').onValue,
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const Center(
+                          child: CircularProgressIndicator(),
+                        );
+                      }
+
+                      final data = snapshot.data!.snapshot.value;
+
+                      if (data == null) {
+                        return const Center(
+                          child: Text('Aun no tienes citas programadas'),
+                        );
+                      }
+
+                      Map citas = data as Map;
+
+                      final hoy = DateTime.now();
+                      final hoyString = '${hoy.day}/${hoy.month}/${hoy.year}';
+
+                      List items = citas.entries.where((entry) {
+                        final cita = entry.value;
+                        final esTrabajadora = cita['trabajadora']
+                                .toString()
+                                .toLowerCase()
+                            ==
+                            nombreUsuario.toLowerCase();
+                        final esHoy = (cita['fecha'] ?? '').toString().trim() == hoyString;
+                        return esTrabajadora && esHoy;
+                      }).toList();
+
+                      if (items.isEmpty) {
+                        return const Center(
+                          child: Text(
+                            'Aun no tienes citas programadas para hoy',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 16,
+                            ),
+                          ),
+                        );
+                      }
+
+                      return ListView.builder(
+                        itemCount: items.length,
+                        itemBuilder: (context, index) {
+                          final id = items[index].key;
+                          final cita = items[index].value;
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 18),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).cardColor,
+                              borderRadius: BorderRadius.circular(25),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(18),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 28,
+                                        backgroundColor: colorEstado(cita['estado']),
+                                        child: const Icon(
+                                          Icons.calendar_month,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 15),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              cita['cliente'],
+                                              style: const TextStyle(
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 5),
+                                            Text(cita['servicio']),
+                                          ],
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 8,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: colorEstado(cita['estado']),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Text(
+                                          cita['estado'].toString().toUpperCase(),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 18),
+                                  Text('Sede: ${cita['sede'] ?? 'No indicada'}'),
+                                  Text('📅 ${cita['fecha']}'),
+                                  Text('⏰ ${cita['hora']}'),
+                                  Text('👩 ${cita['trabajadora']}'),
+                                  Text('📞 ${cita['telefono']}'),
+                                  Text('💰 S/ ${cita['precio']}'),
+                                  Text(
+                                      'Adelanto: S/ ${cita['adelanto'] ?? '20'} - ${cita['estadoPago'] ?? 'pendiente'}'),
+                                  if ((cita['observaciones'] ?? '').toString().isNotEmpty)
+                                    Text('Notas: ${cita['observaciones']}'),
+                                  if (cita['estado'] != 'finalizada' && cita['estado'] != 'cancelada') ...[
+                                    const SizedBox(height: 15),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.green,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(15),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                        ),
+                                        onPressed: () {
+                                          actualizarEstado(id, 'finalizada');
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Servicio finalizado con éxito'),
+                                              backgroundColor: Colors.green,
+                                            ),
+                                          );
+                                        },
+                                        icon: const Icon(Icons.done_all, color: Colors.white),
+                                        label: const Text(
+                                          'Finalizar Servicio',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
             ],
           ),
         ),

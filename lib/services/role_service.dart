@@ -29,36 +29,59 @@ class RoleService {
         };
       }
 
-      final snapshot =
+      final rutas = [
+        'administrador',
+        'trabajadoras',
+        'usuarios',
+      ];
 
-      await database
-          .child('usuarios')
-          .child(user.uid)
-          .get();
+      for (final ruta in rutas) {
+        final snapshot =
+        await database
+            .child(ruta)
+            .child(user.uid)
+            .get();
 
-      if (snapshot.exists) {
+        if (snapshot.exists) {
+          final datos =
+          snapshot.value as Map;
 
-        Map datos =
-        snapshot.value as Map;
+          return {
+            'rol':
+            datos['rol'] ??
+                (ruta == 'administrador' ? 'admin' : 'trabajadora'),
 
-        return {
+            'nombre':
+            datos['nombre'] ??
+                'Usuario',
 
-          'rol':
-          datos['rol'] ??
-              'trabajadora',
+            'telefono':
+            datos['telefono'] ??
+                '',
 
-          'nombre':
-          datos['nombre'] ??
-              'Usuario',
+            'sede':
+            datos['sede'] ??
+                '',
 
-          'correo':
-          user.email ?? '',
-        };
+            'sedePreferida':
+            datos['sedePreferida'] ??
+                datos['sede'] ??
+                '',
+
+            'correo':
+            datos['correo'] ??
+                user.email ??
+                '',
+
+            'ruta':
+            ruta,
+          };
+        }
       }
 
       return {
 
-        'rol': 'trabajadora',
+        'rol': '',
 
         'nombre': 'Usuario',
 
@@ -93,6 +116,14 @@ class RoleService {
     await obtenerRol();
 
     return rol == 'admin';
+  }
+
+  Future<bool> esRecepcionista() async {
+
+    final rol =
+    await obtenerRol();
+
+    return rol == 'recepcionista';
   }
 
   Future<bool> esTrabajadora() async {

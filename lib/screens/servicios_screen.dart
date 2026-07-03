@@ -1,10 +1,8 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+
+import '../utils/koko_config.dart';
 
 class ServiciosScreen
     extends StatefulWidget {
@@ -25,12 +23,10 @@ class _ServiciosScreenState
   final DatabaseReference database =
   FirebaseDatabase.instance.ref();
 
-  final FirebaseStorage storage =
-      FirebaseStorage.instance;
-
-  File? imagenSeleccionada;
-
   bool cargando = false;
+
+  String sedeSeleccionada =
+      KokoConfig.sedes.first;
 
   final TextEditingController
   nombreController =
@@ -47,30 +43,6 @@ class _ServiciosScreenState
   final TextEditingController
   duracionController =
   TextEditingController();
-
-  Future<void>
-  seleccionarImagen() async {
-
-    final picker = ImagePicker();
-
-    final XFile? imagen =
-
-    await picker.pickImage(
-
-      source: ImageSource.gallery,
-
-      imageQuality: 70,
-    );
-
-    if (imagen != null) {
-
-      setState(() {
-
-        imagenSeleccionada =
-            File(imagen.path);
-      });
-    }
-  }
 
   Future<void>
   guardarServicio() async {
@@ -111,23 +83,6 @@ class _ServiciosScreenState
           .push()
           .key!;
 
-      String imageUrl = '';
-
-      if (imagenSeleccionada != null) {
-
-        final ref = storage
-            .ref()
-            .child(
-            'servicios/$id.jpg');
-
-        await ref.putFile(
-          imagenSeleccionada!,
-        );
-
-        imageUrl =
-        await ref.getDownloadURL();
-      }
-
       await database
           .child('servicios')
           .child(id)
@@ -145,8 +100,11 @@ class _ServiciosScreenState
         'duracion':
         duracionController.text,
 
+        'sede':
+        sedeSeleccionada,
+
         'imagen':
-        imageUrl,
+        '',
       });
 
       limpiarCampos();
@@ -199,7 +157,8 @@ class _ServiciosScreenState
 
     duracionController.clear();
 
-    imagenSeleccionada = null;
+    sedeSeleccionada =
+        KokoConfig.sedes.first;
 
     setState(() {});
   }
@@ -564,6 +523,63 @@ class _ServiciosScreenState
 
                       const SizedBox(height: 15),
 
+                      DropdownButtonFormField<String>(
+
+                        value:
+                        sedeSeleccionada,
+
+                        decoration:
+                        InputDecoration(
+
+                          hintText:
+                          'Sede',
+
+                          prefixIcon:
+                          const Icon(Icons.store),
+
+                          filled: true,
+
+                          fillColor:
+                          Theme.of(context)
+                              .cardColor,
+
+                          border:
+                          OutlineInputBorder(
+
+                            borderRadius:
+                            BorderRadius.circular(15),
+
+                            borderSide:
+                            BorderSide.none,
+                          ),
+                        ),
+
+                        items:
+                        KokoConfig.sedes.map((sede) {
+
+                          return DropdownMenuItem(
+
+                            value:
+                            sede,
+
+                            child:
+                            Text(sede),
+                          );
+                        }).toList(),
+
+                        onChanged: (value) {
+
+                          if (value == null) return;
+
+                          setState(() {
+
+                            sedeSeleccionada = value;
+                          });
+                        },
+                      ),
+
+                      const SizedBox(height: 15),
+
                       campoTexto(
 
                         duracionController,
@@ -572,76 +588,6 @@ class _ServiciosScreenState
 
                         Icons.timer,
                       ),
-
-                      const SizedBox(height: 20),
-
-                      SizedBox(
-
-                        width: double.infinity,
-
-                        height: 55,
-
-                        child: ElevatedButton.icon(
-
-                          onPressed:
-                          seleccionarImagen,
-
-                          style:
-                          ElevatedButton.styleFrom(
-
-                            backgroundColor:
-                            Colors.purple,
-
-                            shape:
-                            RoundedRectangleBorder(
-
-                              borderRadius:
-                              BorderRadius.circular(
-                                  15),
-                            ),
-                          ),
-
-                          icon: const Icon(
-
-                            Icons.image,
-
-                            color: Colors.white,
-                          ),
-
-                          label: const Text(
-
-                            'Seleccionar Imagen',
-
-                            style: TextStyle(
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 15),
-
-                      if (imagenSeleccionada != null)
-
-                        ClipRRect(
-
-                          borderRadius:
-                          BorderRadius.circular(
-                              20),
-
-                          child: Image.file(
-
-                            imagenSeleccionada!,
-
-                            height: 180,
-
-                            width:
-                            double.infinity,
-
-                            fit:
-                            BoxFit.cover,
-                          ),
-                        ),
 
                       const SizedBox(height: 20),
 
@@ -913,6 +859,21 @@ class _ServiciosScreenState
                         .textTheme
                         .bodyLarge
                         ?.color,
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                Text(
+
+                  'Sede: ${servicio['sede'] ?? 'No asignada'}',
+
+                  style: const TextStyle(
+
+                    fontSize: 15,
+
+                    fontWeight:
+                    FontWeight.w600,
                   ),
                 ),
 

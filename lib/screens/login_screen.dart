@@ -6,8 +6,8 @@ import '../services/auth_service.dart';
 import '../services/role_service.dart';
 
 import 'dashboard_screen.dart';
+import 'dashboard_recepcion_screen.dart';
 import 'dashboard_trabajadora.dart';
-import 'dashboard_cliente_screen.dart';
 import 'register_cliente_screen.dart';
 import 'seleccionar_sede_screen.dart';
 
@@ -128,6 +128,25 @@ class _LoginScreenState
                   builder: (context) =>
 
                   const DashboardScreen(),
+                ),
+              );
+            }
+
+            // =========================
+            // RECEPCIONISTA
+            // =========================
+
+            else if (rol == 'recepcionista') {
+
+              Navigator.pushReplacement(
+
+                context,
+
+                MaterialPageRoute(
+
+                  builder: (context) =>
+
+                  const DashboardRecepcionScreen(),
                 ),
               );
             }

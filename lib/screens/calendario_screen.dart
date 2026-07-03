@@ -7,6 +7,10 @@ import 'package:printing/printing.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
 
 import '../services/pdf_service.dart';
+import '../services/role_service.dart';
+
+import 'calendario_dia_screen.dart';
+import 'citas_dia_screen.dart';
 
 class CalendarioScreen
     extends StatefulWidget {
@@ -29,6 +33,9 @@ class _CalendarioScreenState
       .ref()
       .child('citas');
 
+  final RoleService roleService =
+      RoleService();
+
   DateTime diaSeleccionado =
   DateTime.now();
 
@@ -41,6 +48,12 @@ class _CalendarioScreenState
   eventos = {};
 
   bool cargando = true;
+
+  String rolUsuario = '';
+
+  String nombreUsuario = '';
+
+  String sedeUsuario = '';
 
   @override
   void initState() {
@@ -57,6 +70,18 @@ class _CalendarioScreenState
       'es_ES',
       null,
     );
+
+    final datos =
+    await roleService.obtenerDatosUsuario();
+
+    rolUsuario =
+        (datos['rol'] ?? '').toString();
+
+    nombreUsuario =
+        (datos['nombre'] ?? '').toString();
+
+    sedeUsuario =
+        (datos['sede'] ?? '').toString();
 
     cargarCitas();
   }
@@ -81,6 +106,27 @@ class _CalendarioScreenState
 
             String fecha =
             value['fecha'];
+
+            final sedeCita =
+                (value['sede'] ?? '').toString();
+
+            final trabajadoraCita =
+                (value['trabajadora'] ?? '').toString();
+
+            if (rolUsuario != 'admin' &&
+                sedeUsuario.isNotEmpty &&
+                sedeCita.isNotEmpty &&
+                sedeCita != sedeUsuario) {
+
+              return;
+            }
+
+            if (rolUsuario == 'trabajadora' &&
+                trabajadoraCita.toLowerCase() !=
+                    nombreUsuario.toLowerCase()) {
+
+              return;
+            }
 
             List partes =
             fecha.split('/');
@@ -186,6 +232,11 @@ class _CalendarioScreenState
 
               [];
     });
+  }
+
+  String textoFecha(DateTime fecha) {
+
+    return '${fecha.day}/${fecha.month}/${fecha.year}';
   }
 
   Future<void>
@@ -501,6 +552,25 @@ class _CalendarioScreenState
                       cargarEventosDelDia(
                         selectedDay,
                       );
+
+                      Navigator.push(
+
+                        context,
+
+                        MaterialPageRoute(
+
+                          builder: (context) =>
+                          rolUsuario == 'trabajadora'
+                              ? CitasDiaScreen(
+                                  fecha:
+                                  textoFecha(selectedDay),
+                                )
+                              : CalendarioDiaScreen(
+                            fecha:
+                            textoFecha(selectedDay),
+                          ),
+                        ),
+                      );
                     },
 
                     calendarStyle:
@@ -551,30 +621,13 @@ class _CalendarioScreenState
 
                 const SizedBox(height: 30),
 
-                const Text(
-
-                  'Citas del Día',
-
-                  style: TextStyle(
-
-                    fontSize: 24,
-
-                    fontWeight:
-                    FontWeight.bold,
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                citasDelDia.isEmpty
-
-                    ? Container(
+                Container(
 
                   width:
                   double.infinity,
 
                   padding:
-                  const EdgeInsets.all(25),
+                  const EdgeInsets.all(22),
 
                   decoration:
                   BoxDecoration(
@@ -584,426 +637,104 @@ class _CalendarioScreenState
                         .cardColor,
 
                     borderRadius:
-                    BorderRadius.circular(
-                        20),
-                  ),
+                    BorderRadius.circular(22),
 
-                  child: const Center(
+                    boxShadow: [
 
-                    child: Text(
-
-                      'No hay citas para este día',
-
-                      style: TextStyle(
-
-                        fontSize: 16,
+                      BoxShadow(
 
                         color:
-                        Colors.grey,
+                        Colors.black
+                            .withOpacity(0.05),
+
+                        blurRadius: 10,
+
+                        offset:
+                        const Offset(0, 4),
                       ),
-                    ),
+                    ],
                   ),
-                )
 
-                    : ListView.builder(
+                  child: Column(
 
-                  shrinkWrap: true,
+                    crossAxisAlignment:
+                    CrossAxisAlignment.start,
 
-                  physics:
-                  const NeverScrollableScrollPhysics(),
+                    children: [
 
-                  itemCount:
-                  citasDelDia.length,
+                      const Text(
 
-                  itemBuilder:
-                      (context, index) {
+                        'Revisar agenda del dia',
 
-                    final cita =
-                    citasDelDia[index];
+                        style: TextStyle(
 
-                    return Container(
+                          fontSize: 20,
 
-                      margin:
-                      const EdgeInsets.only(
-                        bottom: 18,
+                          fontWeight:
+                          FontWeight.bold,
+                        ),
                       ),
 
-                      padding:
-                      const EdgeInsets.all(
-                          18),
+                      const SizedBox(height: 8),
 
-                      decoration:
-                      BoxDecoration(
+                      Text(
 
-                        color:
-                        Theme.of(context)
-                            .cardColor,
+                        'Toca una fecha del calendario para ver franjas horarias y citas de ese dia.',
 
-                        borderRadius:
-                        BorderRadius.circular(
-                            25),
+                        style: TextStyle(
 
-                        boxShadow: [
-
-                          BoxShadow(
-
-                            color:
-                            Colors.black
-                                .withOpacity(
-                                0.05),
-
-                            blurRadius: 8,
-
-                            offset:
-                            const Offset(
-                                0,
-                                4),
-                          ),
-                        ],
+                          color:
+                          Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.color
+                              ?.withOpacity(0.7),
+                        ),
                       ),
 
-                      child: Column(
+                      const SizedBox(height: 16),
 
-                        crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                      SizedBox(
 
-                        children: [
+                        width:
+                        double.infinity,
 
-                          Row(
+                        child: ElevatedButton.icon(
 
-                            children: [
+                          onPressed: () {
 
-                              CircleAvatar(
+                            Navigator.push(
 
-                                radius: 28,
+                              context,
 
-                                backgroundColor:
-                                colorEstado(
+                              MaterialPageRoute(
 
-                                  cita['estado'],
-                                ),
+                                builder: (context) =>
+                                rolUsuario == 'trabajadora'
+                                    ? CitasDiaScreen(
+                                        fecha:
+                                        textoFecha(diaSeleccionado),
+                                      )
+                                    : CalendarioDiaScreen(
 
-                                child: Icon(
-
-                                  iconoEstado(
-
-                                    cita['estado'],
-                                  ),
-
-                                  color:
-                                  Colors.white,
+                                  fecha:
+                                  textoFecha(diaSeleccionado),
                                 ),
                               ),
-
-                              const SizedBox(
-                                  width: 15),
-
-                              Expanded(
-
-                                child: Column(
-
-                                  crossAxisAlignment:
-                                  CrossAxisAlignment
-                                      .start,
-
-                                  children: [
-
-                                    Text(
-
-                                      cita['cliente'],
-
-                                      style:
-                                      const TextStyle(
-
-                                        fontSize:
-                                        20,
-
-                                        fontWeight:
-                                        FontWeight.bold,
-                                      ),
-                                    ),
-
-                                    const SizedBox(
-                                        height:
-                                        5),
-
-                                    Text(
-                                      cita['servicio'],
-                                    ),
-
-                                    Text(
-                                      '👩 ${cita['trabajadora']}',
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              Container(
-
-                                padding:
-                                const EdgeInsets.symmetric(
-
-                                  horizontal:
-                                  12,
-
-                                  vertical:
-                                  8,
-                                ),
-
-                                decoration:
-                                BoxDecoration(
-
-                                  color:
-                                  colorEstado(
-
-                                    cita['estado'],
-                                  ),
-
-                                  borderRadius:
-                                  BorderRadius.circular(
-                                      20),
-                                ),
-
-                                child: Text(
-
-                                  cita['estado']
-                                      .toString()
-                                      .toUpperCase(),
-
-                                  style:
-                                  const TextStyle(
-
-                                    color:
-                                    Colors.white,
-
-                                    fontWeight:
-                                    FontWeight.bold,
-
-                                    fontSize:
-                                    12,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 15),
-
-                          Text(
-                            '📅 ${cita['fecha']}',
-                          ),
-
-                          Text(
-                            '⏰ ${cita['hora']}',
-                          ),
-
-                          Text(
-                            '📞 ${cita['telefono']}',
-                          ),
-
-                          Text(
-                            '💰 S/ ${cita['precio']}',
-                          ),
-
-                          const SizedBox(height: 18),
-
-                          Wrap(
-
-                            spacing: 10,
-
-                            runSpacing: 10,
-
-                            children: [
-
-                              ElevatedButton.icon(
-
-                                style:
-                                ElevatedButton.styleFrom(
-
-                                  backgroundColor:
-                                  Colors.blue,
-                                ),
-
-                                onPressed: () {
-
-                                  actualizarEstado(
-
-                                    cita['id'],
-
-                                    'confirmada',
-                                  );
-                                },
-
-                                icon: const Icon(
-
-                                  Icons.check,
-
-                                  color:
-                                  Colors.white,
-                                ),
-
-                                label: const Text(
-
-                                  'Confirmar',
-
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-
-                              ElevatedButton.icon(
-
-                                style:
-                                ElevatedButton.styleFrom(
-
-                                  backgroundColor:
-                                  Colors.green,
-                                ),
-
-                                onPressed: () {
-
-                                  actualizarEstado(
-
-                                    cita['id'],
-
-                                    'finalizada',
-                                  );
-                                },
-
-                                icon: const Icon(
-
-                                  Icons.done_all,
-
-                                  color:
-                                  Colors.white,
-                                ),
-
-                                label: const Text(
-
-                                  'Finalizar',
-
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-
-                              ElevatedButton.icon(
-
-                                style:
-                                ElevatedButton.styleFrom(
-
-                                  backgroundColor:
-                                  Colors.green.shade700,
-                                ),
-
-                                onPressed: () {
-
-                                  enviarWhatsApp(
-
-                                    cita['telefono'],
-
-                                    cita['cliente'],
-
-                                    cita['fecha'],
-
-                                    cita['hora'],
-
-                                    cita['servicio'],
-                                  );
-                                },
-
-                                icon: const Icon(
-
-                                  Icons.message,
-
-                                  color:
-                                  Colors.white,
-                                ),
-
-                                label: const Text(
-
-                                  'WhatsApp',
-
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-
-                              ElevatedButton.icon(
-
-                                style:
-                                ElevatedButton.styleFrom(
-
-                                  backgroundColor:
-                                  Colors.deepOrange,
-                                ),
-
-                                onPressed: () {
-
-                                  generarPDF(cita);
-                                },
-
-                                icon: const Icon(
-
-                                  Icons.picture_as_pdf,
-
-                                  color:
-                                  Colors.white,
-                                ),
-
-                                label: const Text(
-
-                                  'PDF',
-
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-
-                              ElevatedButton.icon(
-
-                                style:
-                                ElevatedButton.styleFrom(
-
-                                  backgroundColor:
-                                  Colors.red,
-                                ),
-
-                                onPressed: () {
-
-                                  eliminarCita(
-                                    cita['id'],
-                                  );
-                                },
-
-                                icon: const Icon(
-
-                                  Icons.delete,
-
-                                  color:
-                                  Colors.white,
-                                ),
-
-                                label: const Text(
-
-                                  'Eliminar',
-
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                            );
+                          },
+
+                          icon:
+                          const Icon(Icons.open_in_new),
+
+                          label:
+                          const Text('Abrir dia seleccionado'),
+                        ),
                       ),
-                    );
-                  },
+                    ],
+                  ),
                 ),
+
               ],
             ),
           ),

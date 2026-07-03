@@ -127,6 +127,15 @@ class _ReservarCitaScreenState
             value['imagen'],
           });
         });
+
+        servicios.add({
+          'id': 'personalizado',
+          'nombre': 'Servicio Personalizado',
+          'precio': '0',
+          'descripcion': 'Servicio con precio y detalles personalizados',
+          'duracion': '60',
+          'imagen': '',
+        });
       }
 
       setState(() {});
@@ -150,20 +159,14 @@ class _ReservarCitaScreenState
         data as Map;
 
         trabajadorasMap.forEach((key, value) {
-
-          trabajadoras.add({
-
-            'id': key,
-
-            'nombre':
-            value['nombre'],
-
-            'horaEntrada':
-            value['horaEntrada'],
-
-            'horaSalida':
-            value['horaSalida'],
-          });
+          if (value is Map && value['rol'] != 'recepcionista') {
+            trabajadoras.add({
+              'id': key,
+              'nombre': value['nombre'],
+              'horaEntrada': value['horaEntrada'],
+              'horaSalida': value['horaSalida'],
+            });
+          }
         });
       }
 
