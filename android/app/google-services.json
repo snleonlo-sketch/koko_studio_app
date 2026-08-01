@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "1008020211464",
-    "project_id": "kokostudio2",
-    "storage_bucket": "kokostudio2.firebasestorage.app"
+    "project_number": "392038916527",
+    "project_id": "final-kokostudio",
+    "storage_bucket": "final-kokostudio.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1008020211464:android:c09bf4221f6619d6638ebd",
+        "mobilesdk_app_id": "1:392038916527:android:84c905ae5dfda15eb10f5a",
         "android_client_info": {
           "package_name": "com.kokostudio.koko_studio_app"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAmAvEKvDAls_W_VQOPCjHT6EQr9Rg6nuI"
+          "current_key": "AIzaSyBP5EgfQdseCxbNykUNb_ni5oZGzD6ZSCM"
         }
       ],
       "services": {

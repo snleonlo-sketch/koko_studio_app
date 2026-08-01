@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
+import '../services/firestore_database_shim.dart';
 import 'package:provider/provider.dart';
 
 import '../themes/theme_provider.dart';
@@ -379,7 +379,7 @@ class _DashboardTrabajadoraScreenState
 
                           const Text(
 
-                            'Bienvenida 💖',
+                            'Bienvenida ',
 
                             style: TextStyle(
 
@@ -416,7 +416,7 @@ class _DashboardTrabajadoraScreenState
 
                           const Text(
 
-                            'Gestiona tus citas y atención profesionalmente ✨',
+                            'Gestiona tus citas y atención profesionalmente ',
 
                             style: TextStyle(
 
@@ -595,7 +595,7 @@ class _DashboardTrabajadoraScreenState
 
                     const Text(
 
-                      'Sistema profesional de gestión de citas 💖',
+                      'Sistema profesional de gestión de citas ',
 
                       textAlign:
                       TextAlign.center,
@@ -775,3 +775,5 @@ class _DashboardTrabajadoraScreenState
     );
   }
 }
+
+

@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
+import '../services/firestore_database_shim.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
 
 import 'login_cliente_screen.dart';
@@ -140,7 +140,7 @@ class _ProfileClienteScreenState
         title: 'Actualizado',
 
         desc:
-        'Perfil actualizado correctamente 💖',
+        'Perfil actualizado correctamente ',
 
         btnOkOnPress: () {},
       ).show();
@@ -584,7 +584,7 @@ class _ProfileClienteScreenState
 
                     Text(
 
-                      'Koko Studio 💖',
+                      'Koko Studio ',
 
                       style: TextStyle(
 
@@ -599,7 +599,7 @@ class _ProfileClienteScreenState
 
                     Text(
 
-                      'Gracias por formar parte de nuestra familia ✨',
+                      'Gracias por formar parte de nuestra familia ',
 
                       textAlign:
                       TextAlign.center,
@@ -673,3 +673,4 @@ class _ProfileClienteScreenState
     );
   }
 }
+

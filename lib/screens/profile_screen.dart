@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../utils/koko_config.dart';
 import '../services/role_service.dart';
@@ -25,8 +25,8 @@ class _ProfileScreenState
   final user =
       FirebaseAuth.instance.currentUser;
 
-  final DatabaseReference database =
-  FirebaseDatabase.instance.ref();
+  final FirebaseFirestore firestore =
+      FirebaseFirestore.instance;
 
   final RoleService roleService =
       RoleService();
@@ -377,13 +377,12 @@ class _ProfileScreenState
 
                               if (user == null) return;
 
-                              await database
-                                  .child('usuarios')
-                                  .child(user!.uid)
-                                  .update({
-
+                              await firestore
+                                  .collection('usuarios')
+                                  .doc(user!.uid)
+                                  .set({
                                 'sedePreferida': sede,
-                              });
+                              }, SetOptions(merge: true));
 
                               setState(() {
 
@@ -541,3 +540,4 @@ class _ProfileScreenState
     );
   }
 }
+

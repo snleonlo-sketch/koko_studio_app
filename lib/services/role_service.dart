@@ -1,136 +1,110 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RoleService {
+  final FirebaseFirestore firestore = FirebaseFirestore.instance;
+  final FirebaseAuth auth = FirebaseAuth.instance;
 
-  final DatabaseReference database =
-  FirebaseDatabase.instance.ref();
-
-  final FirebaseAuth auth =
-      FirebaseAuth.instance;
-
-  Future<Map<String, dynamic>>
-  obtenerDatosUsuario() async {
-
+  Future<Map<String, dynamic>> obtenerDatosUsuario() async {
     try {
-
-      User? user =
-          auth.currentUser;
+      final User? user = auth.currentUser;
 
       if (user == null) {
-
         return {
-
-          'rol': 'trabajadora',
-
+          'rol': '',
           'nombre': 'Usuario',
-
           'correo': '',
         };
       }
 
-      final rutas = [
-        'administrador',
-        'trabajadoras',
-        'usuarios',
-      ];
+      final personalSnapshot =
+          await firestore.collection('personal').doc(user.uid).get();
 
-      for (final ruta in rutas) {
-        final snapshot =
-        await database
-            .child(ruta)
-            .child(user.uid)
+      if (personalSnapshot.exists) {
+        return _normalizarDatos(
+          personalSnapshot.data() ?? <String, dynamic>{},
+          user.email,
+          'personal',
+        );
+      }
+
+      final email = user.email?.trim().toLowerCase();
+      if (email != null && email.isNotEmpty) {
+        final personalPorCorreo = await firestore
+            .collection('personal')
+            .where('correo', isEqualTo: email)
+            .limit(1)
             .get();
 
-        if (snapshot.exists) {
-          final datos =
-          snapshot.value as Map;
-
-          return {
-            'rol':
-            datos['rol'] ??
-                (ruta == 'administrador' ? 'admin' : 'trabajadora'),
-
-            'nombre':
-            datos['nombre'] ??
-                'Usuario',
-
-            'telefono':
-            datos['telefono'] ??
-                '',
-
-            'sede':
-            datos['sede'] ??
-                '',
-
-            'sedePreferida':
-            datos['sedePreferida'] ??
-                datos['sede'] ??
-                '',
-
-            'correo':
-            datos['correo'] ??
-                user.email ??
-                '',
-
-            'ruta':
-            ruta,
-          };
+        if (personalPorCorreo.docs.isNotEmpty) {
+          return _normalizarDatos(
+            personalPorCorreo.docs.first.data(),
+            user.email,
+            'personal',
+          );
         }
       }
 
-      return {
+      final usuarioSnapshot =
+          await firestore.collection('usuarios').doc(user.uid).get();
 
+      if (usuarioSnapshot.exists) {
+        return _normalizarDatos(
+          usuarioSnapshot.data() ?? <String, dynamic>{},
+          user.email,
+          'usuarios',
+          rolPorDefecto: 'cliente',
+        );
+      }
+
+      return {
         'rol': '',
-
         'nombre': 'Usuario',
-
-        'correo':
-        user.email ?? '',
+        'correo': user.email ?? '',
       };
-
     } catch (e) {
-
       return {
-
-        'rol': 'trabajadora',
-
+        'rol': '',
         'nombre': 'Usuario',
-
-        'correo': '',
+        'correo': auth.currentUser?.email ?? '',
       };
     }
   }
 
+  Map<String, dynamic> _normalizarDatos(
+    Map<String, dynamic> datos,
+    String? email,
+    String ruta, {
+    String rolPorDefecto = '',
+  }) {
+    return {
+      'rol': datos['rol'] ?? rolPorDefecto,
+      'nombre': datos['nombre'] ?? 'Usuario',
+      'telefono': datos['telefono'] ?? '',
+      'sede': datos['sede'] ?? '',
+      'sedePreferida': datos['sedePreferida'] ?? datos['sede'] ?? '',
+      'correo': datos['correo'] ?? email ?? '',
+      'ruta': ruta,
+    };
+  }
+
   Future<String> obtenerRol() async {
-
-    final datos =
-    await obtenerDatosUsuario();
-
-    return datos['rol'];
+    final datos = await obtenerDatosUsuario();
+    return datos['rol'] ?? '';
   }
 
   Future<bool> esAdmin() async {
-
-    final rol =
-    await obtenerRol();
-
+    final rol = await obtenerRol();
     return rol == 'admin';
   }
 
   Future<bool> esRecepcionista() async {
-
-    final rol =
-    await obtenerRol();
-
+    final rol = await obtenerRol();
     return rol == 'recepcionista';
   }
 
   Future<bool> esTrabajadora() async {
-
-    final rol =
-    await obtenerRol();
-
+    final rol = await obtenerRol();
     return rol == 'trabajadora';
   }
 }

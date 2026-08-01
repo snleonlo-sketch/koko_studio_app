@@ -1,5 +1,5 @@
-import 'dart:async';
-import 'package:firebase_database/firebase_database.dart';
+﻿import 'dart:async';
+import '../services/firestore_database_shim.dart';
 import 'package:flutter/material.dart';
 
 import '../services/role_service.dart';
@@ -463,3 +463,5 @@ class _TarjetaClientaWidgetState extends State<TarjetaClientaWidget> {
     );
   }
 }
+
+

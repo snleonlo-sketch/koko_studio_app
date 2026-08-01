@@ -106,7 +106,7 @@ class _LoginScreenState
           animType:
           AnimType.scale,
 
-          title: 'Bienvenida 💖',
+          title: 'Bienvenida ',
 
           desc:
           'Hola $nombre',
@@ -386,7 +386,7 @@ class _LoginScreenState
 
               const Text(
 
-                'Sistema Empresarial de Belleza 💖',
+                'Sistema Empresarial de Belleza ',
 
                 style: TextStyle(
 

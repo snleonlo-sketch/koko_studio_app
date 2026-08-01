@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:firebase_database/firebase_database.dart';
+﻿import 'package:flutter/material.dart';
+import '../services/firestore_database_shim.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -220,7 +220,7 @@ class _ServiciosClienteScreenState
 
                         Text(
 
-                          'Nuestros Servicios 💖',
+                          'Nuestros Servicios ',
 
                           style: TextStyle(
 
@@ -645,7 +645,7 @@ class _ServiciosClienteScreenState
                             Text(
 
                               'Seleccionaste '
-                                  '${servicio['nombre']} 💖',
+                                  '${servicio['nombre']} ',
                             ),
                           ),
                         );
@@ -699,3 +699,5 @@ class _ServiciosClienteScreenState
     );
   }
 }
+
+

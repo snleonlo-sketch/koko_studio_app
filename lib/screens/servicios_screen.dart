@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:firebase_database/firebase_database.dart';
+﻿import 'package:flutter/material.dart';
+import '../services/firestore_database_shim.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
 
 import '../utils/koko_config.dart';
@@ -445,7 +445,7 @@ class _ServiciosScreenState
 
                     Text(
 
-                      'Gestión de Servicios 💖',
+                      'Gestión de Servicios ',
 
                       style: TextStyle(
 
@@ -904,7 +904,7 @@ class _ServiciosScreenState
 
                 Text(
 
-                  '📝 ${servicio['descripcion']}',
+                  ' ${servicio['descripcion']}',
 
                   style: const TextStyle(
 
@@ -916,7 +916,7 @@ class _ServiciosScreenState
 
                 Text(
 
-                  '⏱ ${servicio['duracion']}',
+                  'â± ${servicio['duracion']}',
 
                   style: const TextStyle(
 
@@ -1156,3 +1156,5 @@ class _ServiciosScreenState
     );
   }
 }
+
+

@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
 
 import '../utils/page_transition.dart';
@@ -26,8 +26,8 @@ class _RegisterClienteScreenState
   final FirebaseAuth auth =
       FirebaseAuth.instance;
 
-  final DatabaseReference database =
-  FirebaseDatabase.instance.ref();
+  final FirebaseFirestore firestore =
+      FirebaseFirestore.instance;
 
   final TextEditingController
   nombreController =
@@ -117,22 +117,15 @@ class _RegisterClienteScreenState
       final uid =
           userCredential.user!.uid;
 
-      await database
-          .child('usuarios')
-          .child(uid)
+      await firestore
+          .collection('usuarios')
+          .doc(uid)
           .set({
-
-        'nombre':
-        nombreController.text.trim(),
-
-        'telefono':
-        telefonoController.text.trim(),
-
-        'correo':
-        correoController.text.trim(),
-
-        'rol':
-        'cliente',
+        'nombre': nombreController.text.trim(),
+        'telefono': telefonoController.text.trim(),
+        'correo': correoController.text.trim(),
+        'rol': 'cliente',
+        'createdAt': FieldValue.serverTimestamp(),
       });
 
       if (!mounted) return;
@@ -147,7 +140,7 @@ class _RegisterClienteScreenState
         title: 'Cuenta creada',
 
         desc:
-        'Cliente registrado correctamente 💖',
+        'Cliente registrado correctamente ',
 
         btnOkOnPress: () {
 
@@ -279,7 +272,7 @@ class _RegisterClienteScreenState
 
                 const Text(
 
-                  'Registro de Clientes 💖',
+                  'Registro de Clientes ',
 
                   style: TextStyle(
 
@@ -456,7 +449,7 @@ class _RegisterClienteScreenState
 
                 const Text(
 
-                  'Al registrarte podrás reservar citas y servicios ✨',
+                  'Al registrarte podrás reservar citas y servicios ',
 
                   textAlign:
                   TextAlign.center,
@@ -527,3 +520,4 @@ class _RegisterClienteScreenState
     );
   }
 }
+

@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
+import '../services/firestore_database_shim.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -585,7 +585,7 @@ class _DashboardClienteScreenState
 
                           Text(
 
-                            'Hola $nombreCliente 💖',
+                            'Hola $nombreCliente ',
 
                             style: const TextStyle(
 
@@ -906,7 +906,7 @@ class _DashboardClienteScreenState
 
                     const Text(
 
-                      'Gracias por confiar en nosotros 💖',
+                      'Gracias por confiar en nosotros ',
 
                       textAlign:
                       TextAlign.center,
@@ -1446,3 +1446,5 @@ class _DashboardClienteScreenState
     );
   }
 }
+
+

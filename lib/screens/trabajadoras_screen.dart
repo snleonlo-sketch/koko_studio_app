@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_database/firebase_database.dart';
+import '../services/firestore_database_shim.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
 
 import '../utils/koko_config.dart';
@@ -12,34 +13,26 @@ class TrabajadorasScreen extends StatefulWidget {
   });
 
   @override
-  State<TrabajadorasScreen> createState() =>
-      _TrabajadorasScreenState();
+  State<TrabajadorasScreen> createState() => _TrabajadorasScreenState();
 }
 
 class _TrabajadorasScreenState extends State<TrabajadorasScreen> {
-  final DatabaseReference database =
-      FirebaseDatabase.instance.ref();
+  final DatabaseReference database = FirebaseDatabase.instance.ref();
 
-  final TextEditingController nombreController =
-      TextEditingController();
-  final TextEditingController correoController =
-      TextEditingController();
-  final TextEditingController passwordController =
-      TextEditingController();
-  final TextEditingController telefonoController =
-      TextEditingController();
-  final TextEditingController horaEntradaController =
-      TextEditingController();
-  final TextEditingController horaSalidaController =
-      TextEditingController();
+  final FirebaseFirestore firestore = FirebaseFirestore.instance;
+
+  final TextEditingController nombreController = TextEditingController();
+  final TextEditingController correoController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+  final TextEditingController telefonoController = TextEditingController();
+  final TextEditingController horaEntradaController = TextEditingController();
+  final TextEditingController horaSalidaController = TextEditingController();
 
   bool cargando = false;
 
-  String sedeSeleccionada =
-      KokoConfig.sedes.first;
+  String sedeSeleccionada = KokoConfig.sedes.first;
 
-  String rolSeleccionado =
-      'trabajadora';
+  String rolSeleccionado = 'trabajadora';
 
   final List<String> rolesOperativos = [
     'trabajadora',
@@ -82,7 +75,7 @@ class _TrabajadorasScreenState extends State<TrabajadorasScreen> {
       AwesomeDialog(
         context: context,
         dialogType: DialogType.warning,
-        title: 'Campos vacios',
+        title: 'Campos vacíos',
         desc: 'Complete todos los campos',
         btnOkOnPress: () {},
       ).show();
@@ -93,47 +86,32 @@ class _TrabajadorasScreenState extends State<TrabajadorasScreen> {
       cargando = true;
     });
 
+    FirebaseApp? secondaryApp;
+    FirebaseAuth? secondaryAuth;
+    User? usuarioCreado;
+
     try {
-      final secondaryApp = await Firebase.initializeApp(
-        name:
-            'crearPersonal${DateTime.now().microsecondsSinceEpoch}',
+      secondaryApp = await Firebase.initializeApp(
+        name: 'crearPersonal${DateTime.now().microsecondsSinceEpoch}',
         options: Firebase.app().options,
       );
 
-      final secondaryAuth =
-          FirebaseAuth.instanceFor(app: secondaryApp);
+      secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
 
-      final credential =
-          await secondaryAuth.createUserWithEmailAndPassword(
+      final credential = await secondaryAuth.createUserWithEmailAndPassword(
         email: correoController.text.trim(),
         password: passwordController.text.trim(),
       );
 
-      final uid = credential.user!.uid;
-
-      await database
-          .child('trabajadoras')
-          .child(uid)
-          .set({
-        'nombre': nombreController.text.trim(),
-        'correo': correoController.text.trim(),
-        'password': passwordController.text.trim(),
-        'telefono': telefonoController.text.trim(),
-        'rol': rolSeleccionado,
-        'sede': sedeSeleccionada,
-        'horaEntrada': horaEntradaController.text.trim(),
-        'horaSalida': horaSalidaController.text.trim(),
-      });
-
-      await secondaryAuth.signOut();
-      await secondaryApp.delete();
+      usuarioCreado = credential.user;
+      await guardarPerfilPersonal(usuarioCreado!.uid);
 
       limpiarCampos();
 
       AwesomeDialog(
         context: context,
         dialogType: DialogType.success,
-        title: 'Exito',
+        title: 'Éxito',
         desc: 'Personal registrado correctamente',
         btnOkOnPress: () {},
       ).show();
@@ -142,25 +120,48 @@ class _TrabajadorasScreenState extends State<TrabajadorasScreen> {
 
       switch (e.code) {
         case 'email-already-in-use':
-          mensaje = 'Ese correo ya existe en Authentication';
+          final recuperado = await recuperarPerfilPersonalExistente(
+            secondaryAuth,
+          );
+
+          if (recuperado) {
+            limpiarCampos();
+
+            if (!mounted) return;
+
+            AwesomeDialog(
+              context: context,
+              dialogType: DialogType.success,
+              title: 'Perfil recuperado',
+              desc:
+                  'El correo ya existía en Authentication y ahora también quedó guardado en Personal.',
+              btnOkOnPress: () {},
+            ).show();
+            return;
+          }
+
+          mensaje =
+              'Ese correo ya existe en Authentication, pero no se pudo vincular con Personal. Verifica que la contraseña ingresada sea la misma de esa cuenta.';
           break;
         case 'invalid-email':
-          mensaje = 'El correo no tiene un formato valido';
+          mensaje = 'El correo no tiene un formato válido';
           break;
         case 'weak-password':
-          mensaje = 'La contrasena debe tener al menos 6 caracteres';
+          mensaje = 'La contraseña debe tener al menos 6 caracteres';
           break;
         default:
           mensaje = e.message ?? mensaje;
       }
 
-      AwesomeDialog(
-        context: context,
-        dialogType: DialogType.error,
-        title: 'Error',
-        desc: mensaje,
-        btnOkOnPress: () {},
-      ).show();
+      if (mounted) {
+        AwesomeDialog(
+          context: context,
+          dialogType: DialogType.error,
+          title: 'Error',
+          desc: mensaje,
+          btnOkOnPress: () {},
+        ).show();
+      }
     } catch (e) {
       AwesomeDialog(
         context: context,
@@ -169,12 +170,65 @@ class _TrabajadorasScreenState extends State<TrabajadorasScreen> {
         desc: '$e',
         btnOkOnPress: () {},
       ).show();
+    } finally {
+      try {
+        if (usuarioCreado != null) {
+          final doc = await firestore
+              .collection('personal')
+              .doc(usuarioCreado.uid)
+              .get();
+
+          if (!doc.exists) {
+            await usuarioCreado.delete();
+          }
+        }
+
+        await secondaryAuth?.signOut();
+        await secondaryApp?.delete();
+      } catch (_) {}
     }
 
     if (mounted) {
       setState(() {
         cargando = false;
       });
+    }
+  }
+
+  Future<void> guardarPerfilPersonal(String uid) async {
+    await firestore.collection('personal').doc(uid).set({
+      'nombre': nombreController.text.trim(),
+      'correo': correoController.text.trim().toLowerCase(),
+      'telefono': telefonoController.text.trim(),
+      'rol': rolSeleccionado,
+      'sede': sedeSeleccionada,
+      'horaEntrada': horaEntradaController.text.trim(),
+      'horaSalida': horaSalidaController.text.trim(),
+      'activo': true,
+      'authUid': uid,
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<bool> recuperarPerfilPersonalExistente(
+    FirebaseAuth? secondaryAuth,
+  ) async {
+    if (secondaryAuth == null) return false;
+
+    try {
+      final credential = await secondaryAuth.signInWithEmailAndPassword(
+        email: correoController.text.trim(),
+        password: passwordController.text.trim(),
+      );
+
+      final uid = credential.user?.uid;
+      if (uid == null) return false;
+
+      await guardarPerfilPersonal(uid);
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -186,19 +240,14 @@ class _TrabajadorasScreenState extends State<TrabajadorasScreen> {
     horaEntradaController.clear();
     horaSalidaController.clear();
 
-    sedeSeleccionada =
-        KokoConfig.sedes.first;
-    rolSeleccionado =
-        'trabajadora';
+    sedeSeleccionada = KokoConfig.sedes.first;
+    rolSeleccionado = 'trabajadora';
 
     setState(() {});
   }
 
   Future<void> eliminarTrabajadora(String id) async {
-    await database
-        .child('trabajadoras')
-        .child(id)
-        .remove();
+    await database.child('trabajadoras').child(id).remove();
 
     if (!mounted) return;
 
@@ -231,15 +280,13 @@ class _TrabajadorasScreenState extends State<TrabajadorasScreen> {
       text: (trabajadora['horaSalida'] ?? '').toString(),
     );
 
-    String sedeEditar =
-        KokoConfig.sedes.contains(trabajadora['sede'])
-            ? trabajadora['sede']
-            : KokoConfig.sedes.first;
+    String sedeEditar = KokoConfig.sedes.contains(trabajadora['sede'])
+        ? trabajadora['sede']
+        : KokoConfig.sedes.first;
 
-    String rolEditar =
-        rolesOperativos.contains(trabajadora['rol'])
-            ? trabajadora['rol']
-            : 'trabajadora';
+    String rolEditar = rolesOperativos.contains(trabajadora['rol'])
+        ? trabajadora['rol']
+        : 'trabajadora';
 
     await showDialog(
       context: context,
@@ -259,7 +306,7 @@ class _TrabajadorasScreenState extends State<TrabajadorasScreen> {
                     const SizedBox(height: 12),
                     campoEditar(correoEditar, 'Correo'),
                     const SizedBox(height: 12),
-                    campoEditar(telefonoEditar, 'Telefono'),
+                    campoEditar(telefonoEditar, 'Teléfono'),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       value: rolEditar,
@@ -339,10 +386,7 @@ class _TrabajadorasScreenState extends State<TrabajadorasScreen> {
                     backgroundColor: const Color(0xFFD9A5B3),
                   ),
                   onPressed: () async {
-                    await database
-                        .child('trabajadoras')
-                        .child(id)
-                        .update({
+                    await database.child('trabajadoras').child(id).update({
                       'nombre': nombreEditar.text.trim(),
                       'correo': correoEditar.text.trim(),
                       'telefono': telefonoEditar.text.trim(),
@@ -379,8 +423,7 @@ class _TrabajadorasScreenState extends State<TrabajadorasScreen> {
     String filtroSede = 'Todas';
     String filtroRol = 'Todos';
     String busqueda = '';
-    final buscarListaController =
-        TextEditingController();
+    final buscarListaController = TextEditingController();
 
     showModalBottomSheet(
       context: context,
@@ -428,7 +471,7 @@ class _TrabajadorasScreenState extends State<TrabajadorasScreen> {
                       TextField(
                         controller: buscarListaController,
                         decoration: decoracionInput(
-                          'Buscar por nombre, correo o telefono',
+                          'Buscar por nombre, correo o teléfono',
                           Icons.search,
                         ),
                         onChanged: (value) {
@@ -445,7 +488,8 @@ class _TrabajadorasScreenState extends State<TrabajadorasScreen> {
                               value: filtroSede,
                               decoration: InputDecoration(
                                 labelText: 'Sede',
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10),
                                 filled: true,
                                 fillColor: Theme.of(context).cardColor,
                                 border: OutlineInputBorder(
@@ -476,7 +520,8 @@ class _TrabajadorasScreenState extends State<TrabajadorasScreen> {
                               value: filtroRol,
                               decoration: InputDecoration(
                                 labelText: 'Rol',
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10),
                                 filled: true,
                                 fillColor: Theme.of(context).cardColor,
                                 border: OutlineInputBorder(
@@ -509,9 +554,7 @@ class _TrabajadorasScreenState extends State<TrabajadorasScreen> {
                       const SizedBox(height: 16),
                       Expanded(
                         child: StreamBuilder(
-                          stream: database
-                              .child('trabajadoras')
-                              .onValue,
+                          stream: database.child('trabajadoras').onValue,
                           builder: (context, snapshot) {
                             if (!snapshot.hasData) {
                               return const Center(
@@ -519,8 +562,7 @@ class _TrabajadorasScreenState extends State<TrabajadorasScreen> {
                               );
                             }
 
-                            final data =
-                                snapshot.data!.snapshot.value;
+                            final data = snapshot.data!.snapshot.value;
 
                             if (data == null) {
                               return mensajeVacio();
@@ -529,40 +571,30 @@ class _TrabajadorasScreenState extends State<TrabajadorasScreen> {
                             final mapa = data as Map;
                             final items = mapa.entries.where((entry) {
                               final trabajador = entry.value as Map;
-                              final nombre =
-                                  (trabajador['nombre'] ?? '')
-                                      .toString()
-                                      .toLowerCase();
-                              final correo =
-                                  (trabajador['correo'] ?? '')
-                                      .toString()
-                                      .toLowerCase();
-                              final telefono =
-                                  (trabajador['telefono'] ?? '')
-                                      .toString()
-                                      .toLowerCase();
+                              final nombre = (trabajador['nombre'] ?? '')
+                                  .toString()
+                                  .toLowerCase();
+                              final correo = (trabajador['correo'] ?? '')
+                                  .toString()
+                                  .toLowerCase();
+                              final telefono = (trabajador['telefono'] ?? '')
+                                  .toString()
+                                  .toLowerCase();
                               final sede =
-                                  (trabajador['sede'] ?? '')
-                                      .toString();
-                              final rol =
-                                  (trabajador['rol'] ?? 'trabajadora')
-                                      .toString();
+                                  (trabajador['sede'] ?? '').toString();
+                              final rol = (trabajador['rol'] ?? 'trabajadora')
+                                  .toString();
 
-                              final cumpleBusqueda =
-                                  busqueda.isEmpty ||
-                                      nombre.contains(busqueda) ||
-                                      correo.contains(busqueda) ||
-                                      telefono.contains(busqueda);
+                              final cumpleBusqueda = busqueda.isEmpty ||
+                                  nombre.contains(busqueda) ||
+                                  correo.contains(busqueda) ||
+                                  telefono.contains(busqueda);
                               final cumpleSede =
-                                  filtroSede == 'Todas' ||
-                                      sede == filtroSede;
+                                  filtroSede == 'Todas' || sede == filtroSede;
                               final cumpleRol =
-                                  filtroRol == 'Todos' ||
-                                      rol == filtroRol;
+                                  filtroRol == 'Todos' || rol == filtroRol;
 
-                              return cumpleBusqueda &&
-                                  cumpleSede &&
-                                  cumpleRol;
+                              return cumpleBusqueda && cumpleSede && cumpleRol;
                             }).toList();
 
                             if (items.isEmpty) {
@@ -573,8 +605,7 @@ class _TrabajadorasScreenState extends State<TrabajadorasScreen> {
                               itemCount: items.length,
                               itemBuilder: (context, index) {
                                 final id = items[index].key;
-                                final trabajadora =
-                                    items[index].value as Map;
+                                final trabajadora = items[index].value as Map;
 
                                 return tarjetaTrabajadora(
                                   id,
@@ -614,8 +645,7 @@ class _TrabajadorasScreenState extends State<TrabajadorasScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:
-          Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         elevation: 0,
         centerTitle: true,
@@ -685,14 +715,14 @@ class _TrabajadorasScreenState extends State<TrabajadorasScreen> {
               const SizedBox(height: 15),
               campoTexto(
                 passwordController,
-                'Contrasena referencial',
+                'Contraseña referencial',
                 Icons.lock,
                 oculto: true,
               ),
               const SizedBox(height: 15),
               campoTexto(
                 telefonoController,
-                'Telefono',
+                'Teléfono',
                 Icons.phone,
               ),
               const SizedBox(height: 15),
@@ -774,8 +804,7 @@ class _TrabajadorasScreenState extends State<TrabajadorasScreen> {
                 width: double.infinity,
                 height: 55,
                 child: ElevatedButton(
-                  onPressed:
-                      cargando ? null : guardarTrabajadora,
+                  onPressed: cargando ? null : guardarTrabajadora,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFD9A5B3),
                     shape: RoundedRectangleBorder(
@@ -819,8 +848,7 @@ class _TrabajadorasScreenState extends State<TrabajadorasScreen> {
     Map trabajadora, {
     required VoidCallback cerrarLista,
   }) {
-    final rol =
-        (trabajadora['rol'] ?? 'trabajadora').toString();
+    final rol = (trabajadora['rol'] ?? 'trabajadora').toString();
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -841,12 +869,9 @@ class _TrabajadorasScreenState extends State<TrabajadorasScreen> {
         children: [
           CircleAvatar(
             radius: 28,
-            backgroundColor:
-                const Color(0xFFD9A5B3).withOpacity(0.85),
+            backgroundColor: const Color(0xFFD9A5B3).withOpacity(0.85),
             child: Icon(
-              rol == 'recepcionista'
-                  ? Icons.support_agent
-                  : Icons.spa,
+              rol == 'recepcionista' ? Icons.support_agent : Icons.spa,
               color: Colors.white,
             ),
           ),

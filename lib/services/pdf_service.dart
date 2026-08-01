@@ -215,7 +215,7 @@ class PdfService {
 
                     pw.Text(
 
-                      'Gracias por confiar en Koko Studio 💖',
+                      'Gracias por confiar en Koko Studio ',
 
                       style: pw.TextStyle(
 
@@ -684,7 +684,7 @@ class PdfService {
               pw.Center(
 
                 child: pw.Text(
-                  'Gracias por tu gran gestión en Koko Studio 💖',
+                  'Gracias por tu gran gestión en Koko Studio ',
                   style: pw.TextStyle(
                     fontSize: 12,
                     fontStyle: pw.FontStyle.italic,

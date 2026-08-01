@@ -1,5 +1,5 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
+﻿import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../utils/koko_config.dart';
@@ -22,8 +22,8 @@ class _SeleccionarSedeScreenState
   final usuario =
       FirebaseAuth.instance.currentUser;
 
-  final DatabaseReference database =
-      FirebaseDatabase.instance.ref();
+  final FirebaseFirestore firestore =
+      FirebaseFirestore.instance;
 
   bool guardando = false;
 
@@ -37,12 +37,12 @@ class _SeleccionarSedeScreenState
       guardando = true;
     });
 
-    await database
-        .child('usuarios')
-        .child(uid)
-        .update({
+    await firestore
+        .collection('usuarios')
+        .doc(uid)
+        .set({
       'sedePreferida': sede,
-    });
+    }, SetOptions(merge: true));
 
     if (!mounted) return;
 
@@ -174,3 +174,4 @@ class _SeleccionarSedeScreenState
     );
   }
 }
+

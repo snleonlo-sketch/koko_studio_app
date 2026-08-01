@@ -1,6 +1,6 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:firebase_database/firebase_database.dart';
+import '../services/firestore_database_shim.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:printing/printing.dart';
 import '../services/pdf_service.dart';
@@ -386,7 +386,7 @@ class _EstadisticasScreenState
               ),
               title: const Center(
                 child: Text(
-                  'Seleccionar Período 📅',
+                  'Seleccionar Período ',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
@@ -716,7 +716,7 @@ class _EstadisticasScreenState
 
                   const Text(
 
-                    'Resumen General 💖',
+                    'Resumen General ',
 
                     style: TextStyle(
 
@@ -1481,3 +1481,5 @@ class _EstadisticasScreenState
     );
   }
 }
+
+

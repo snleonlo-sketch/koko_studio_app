@@ -54,7 +54,7 @@ class _PagosScreenState extends State<PagosScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Pagos Koko Studio 💖',
+                      'Pagos Koko Studio ',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 26,

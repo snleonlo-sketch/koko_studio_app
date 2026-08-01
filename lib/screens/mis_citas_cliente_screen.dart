@@ -1,5 +1,5 @@
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
+﻿import 'package:firebase_auth/firebase_auth.dart';
+import '../services/firestore_database_shim.dart';
 import 'package:flutter/material.dart';
 
 class MisCitasClienteScreen extends StatefulWidget {
@@ -292,3 +292,5 @@ class _MisCitasClienteScreenState
     );
   }
 }
+
+

@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:firebase_database/firebase_database.dart';
+﻿import 'package:flutter/material.dart';
+import '../services/firestore_database_shim.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -320,16 +320,16 @@ class _CalendarioScreenState
 
     String mensaje =
 
-        'Hola $cliente 💖\n\n'
+        'Hola $cliente \n\n'
 
         'Te recordamos tu cita en '
-        'Koko Studio ✨\n\n'
+        'Koko Studio \n\n'
 
-        '📅 Fecha: $fecha\n'
-        '⏰ Hora: $hora\n'
-        '💅 Servicio: $servicio\n\n'
+        ' Fecha: $fecha\n'
+        'â° Hora: $hora\n'
+        ' Servicio: $servicio\n\n'
 
-        'Te esperamos 💕';
+        'Te esperamos ';
 
     final Uri uri = Uri.parse(
 
@@ -743,3 +743,5 @@ class _CalendarioScreenState
     );
   }
 }
+
+

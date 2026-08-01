@@ -1,6 +1,6 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:firebase_database/firebase_database.dart';
+import '../services/firestore_database_shim.dart';
 
 import '../utils/koko_config.dart';
 
@@ -496,3 +496,5 @@ class _AlertasAdminScreenState extends State<AlertasAdminScreen> {
     );
   }
 }
+
+

@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:firebase_database/firebase_database.dart';
+﻿import 'package:flutter/material.dart';
+import '../services/firestore_database_shim.dart';
 import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -861,3 +861,5 @@ class _HistorialScreenState extends State<HistorialScreen> {
     );
   }
 }
+
+

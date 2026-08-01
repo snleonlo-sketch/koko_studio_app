@@ -1,7 +1,7 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
+import '../services/firestore_database_shim.dart';
 import 'package:provider/provider.dart';
 
 import '../themes/theme_provider.dart';
@@ -538,7 +538,7 @@ class _DashboardScreenState
 
                           const Text(
 
-                            'Bienvenido 💖',
+                            'Bienvenido ',
 
                             style: TextStyle(
 
@@ -575,7 +575,7 @@ class _DashboardScreenState
 
                           const Text(
 
-                            'Sistema profesional de gestión para Koko Studio ✨',
+                            'Sistema profesional de gestión para Koko Studio ',
 
                             style: TextStyle(
 
@@ -810,7 +810,7 @@ class _DashboardScreenState
 
                     const Text(
 
-                      'Sistema premium de gestión de citas, servicios y trabajadoras 💖',
+                      'Sistema premium de gestión de citas, servicios y trabajadoras ',
 
                       textAlign:
                       TextAlign.center,
@@ -1088,3 +1088,5 @@ class _DashboardScreenState
     );
   }
 }
+
+

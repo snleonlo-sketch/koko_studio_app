@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
+import '../services/firestore_database_shim.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
 
 import 'pagos_screen.dart';
@@ -331,7 +331,7 @@ class _ReservarCitaScreenState
         title: 'Cita Solicitada',
 
         desc:
-        'La trabajadora deberá confirmar tu cita 💖',
+        'La trabajadora deberá confirmar tu cita ',
 
         btnOkOnPress: () {
 
@@ -711,3 +711,4 @@ class _ReservarCitaScreenState
     );
   }
 }
+

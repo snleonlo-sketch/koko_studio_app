@@ -1,6 +1,6 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:firebase_database/firebase_database.dart';
+import '../services/firestore_database_shim.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:printing/printing.dart';
@@ -455,7 +455,7 @@ class _CitasScreenState
           .mostrarNotificacion(
 
         titulo:
-        citaEditandoId == null ? 'Nueva cita 💖' : 'Cita actualizada 💖',
+        citaEditandoId == null ? 'Nueva cita ' : 'Cita actualizada ',
 
         mensaje:
         '${clienteController.text} ${citaEditandoId == null ? 'registrada' : 'actualizada'}',
@@ -659,16 +659,16 @@ class _CitasScreenState
 
     String mensaje =
 
-        'Hola $cliente 💖\n\n'
+        'Hola $cliente \n\n'
 
         'Te recordamos tu cita en '
-        'Koko Studio ✨\n\n'
+        'Koko Studio \n\n'
 
-        '📅 Fecha: $fecha\n'
-        '⏰ Hora: $hora\n'
-        '💅 Servicio: $servicio\n\n'
+        ' Fecha: $fecha\n'
+        'â° Hora: $hora\n'
+        ' Servicio: $servicio\n\n'
 
-        'Te esperamos 💕';
+        'Te esperamos ';
 
     final Uri uri = Uri.parse(
 
@@ -1266,8 +1266,8 @@ class _CitasScreenState
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const SizedBox(height: 4),
-                                Text('📞 ${clienta['telefono']}'),
-                                if (clienta['correo'].isNotEmpty) Text('✉️ ${clienta['correo']}'),
+                                Text(' ${clienta['telefono']}'),
+                                if (clienta['correo'].isNotEmpty) Text(' ${clienta['correo']}'),
                               ],
                             ),
                             trailing: const Icon(Icons.check_circle_outline, color: Color(0xFFD9A5B3)),
@@ -1414,11 +1414,11 @@ class _CitasScreenState
                                   ),
                                   const SizedBox(height: 18),
                                   Text('Sede: ${cita['sede'] ?? 'No indicada'}'),
-                                  Text('📅 ${cita['fecha']}'),
-                                  Text('⏰ ${cita['hora']}${cita['horaFin'] != null && (cita['horaFin'] ?? '').toString().isNotEmpty ? ' - ${cita['horaFin']}' : ''}'),
-                                  Text('👩 ${cita['trabajadora']}'),
-                                  Text('📞 ${cita['telefono']}'),
-                                  Text('💰 S/ ${cita['precio']}'),
+                                  Text(' ${cita['fecha']}'),
+                                  Text('â° ${cita['hora']}${cita['horaFin'] != null && (cita['horaFin'] ?? '').toString().isNotEmpty ? ' - ${cita['horaFin']}' : ''}'),
+                                  Text(' ${cita['trabajadora']}'),
+                                  Text(' ${cita['telefono']}'),
+                                  Text(' S/ ${cita['precio']}'),
                                   Text(
                                       'Adelanto: S/ ${cita['adelanto'] ?? '20'} - ${cita['estadoPago'] ?? 'pendiente'}'),
                                   if ((cita['observaciones'] ?? '').toString().isNotEmpty)
@@ -1525,3 +1525,5 @@ class _CitasScreenState
     );
   }
 }
+
+

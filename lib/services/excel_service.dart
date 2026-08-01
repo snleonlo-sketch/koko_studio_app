@@ -136,7 +136,7 @@ class ExcelService {
         [XFile(path)],
 
         text:
-        'Reporte de citas Koko Studio 💖',
+        'Reporte de citas Koko Studio ',
       );
 
     } catch (e) {

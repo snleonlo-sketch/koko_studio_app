@@ -1,4 +1,4 @@
-import 'package:firebase_database/firebase_database.dart';
+﻿import 'firestore_database_shim.dart';
 
 import '../models/cita_model.dart';
 
@@ -18,3 +18,4 @@ class CitaService {
         .set(cita.toMap());
   }
 }
+
